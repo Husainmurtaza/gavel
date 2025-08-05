@@ -128,7 +128,12 @@ app.post('/api/login/client', async (req, res) => {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
   const clientToken = jwt.sign({ id: client._id, role: 'client' }, JWT_SECRET, { expiresIn: '1h' });
-  res.cookie('token', clientToken, { httpOnly: true, maxAge: 3600000 });
+  res.cookie('token', clientToken, { 
+    httpOnly: true, 
+    maxAge: 3600000,
+    secure: true,
+    sameSite: 'none'
+  });
   res.json({ message: 'Login successful', redirect: '/dashboard' });
 });
 
@@ -147,7 +152,12 @@ app.post('/api/login/candidate', async (req, res) => {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
   const candidateToken = jwt.sign({ id: candidate._id, role: 'candidate' }, JWT_SECRET, { expiresIn: '1h' });
-  res.cookie('token', candidateToken, { httpOnly: true, maxAge: 3600000 });
+  res.cookie('token', candidateToken, { 
+    httpOnly: true, 
+    maxAge: 3600000,
+    secure: true,
+    sameSite: 'none'
+  });
   res.json({ message: 'Login successful', redirect: '/candidate' });
 });
 
@@ -166,13 +176,22 @@ app.post('/api/login/admin', async (req, res) => {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
   const adminToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '1h' });
-  res.cookie('token', adminToken, { httpOnly: true, maxAge: 3600000 });
+  res.cookie('token', adminToken, { 
+    httpOnly: true, 
+    maxAge: 3600000,
+    secure: true,
+    sameSite: 'none'
+  });
   res.json({ message: 'Admin login successful', redirect: '/admin' });
 });
 
 // Logout route (destroy session)
 app.post('/api/logout', (req, res) => {
-  res.clearCookie('token');
+  res.clearCookie('token', { 
+    httpOnly: true, 
+    secure: true,
+    sameSite: 'none'
+  });
   res.json({ message: 'Logged out successfully' });
 });
 
