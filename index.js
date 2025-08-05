@@ -13,7 +13,7 @@ const Company = require('./models/company');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://GavelDatabase:j5NmOUB8hi1LfBxI@cluster0.mongodb.net/gavel?retryWrites=true&w=majority';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://GavelDatabase:j5NmOUB8hi1LfBxI@GavelCluster.mongodb.net/gavel?retryWrites=true&w=majority';
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
 // Middleware
@@ -28,7 +28,7 @@ app.use(cors({
 app.use(cookieParser());
 
 // MongoDB Connection
-mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('MongoDB connection successful');
   })
