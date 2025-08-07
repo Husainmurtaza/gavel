@@ -57,6 +57,32 @@ app.get('/api/test-auth', authenticate, (req, res) => {
   });
 });
 
+// Test client profile route
+app.get('/api/test-client-profile', authenticate, async (req, res) => {
+  console.log('Test client profile - User:', req.user);
+  if (req.user.role !== 'client') {
+    return res.status(403).json({ message: 'Forbidden - Not a client' });
+  }
+  try {
+    const client = await Client.findById(req.user.id);
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found in database' });
+    }
+    res.json({
+      message: 'Client found',
+      client: {
+        id: client._id,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        email: client.email,
+        phone: client.phone
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // Auth middleware
 function authenticate(req, res, next) {
   const token = req.cookies.token;
@@ -468,7 +494,14 @@ app.get('/api/clients/profile', authenticate, async (req, res) => {
 
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
-  if (req.user.role !== 'client') return res.status(403).json({ message: 'Forbidden' });
+  console.log('PUT /api/clients/profile - User:', req.user); // Debug log
+  console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
+  
+  if (req.user.role !== 'client') {
+    console.log('Forbidden - User role:', req.user.role); // Debug log
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  
   const { firstName, lastName, email, phone } = req.body;
   if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
   try {
@@ -493,6 +526,7 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
       }
     });
   } catch (err) {
+    console.log('Error in profile update:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
