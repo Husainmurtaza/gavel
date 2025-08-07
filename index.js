@@ -101,6 +101,52 @@ app.get('/api/test-all-clients', async (req, res) => {
   }
 });
 
+// Route to refresh JWT token with correct role from database
+app.post('/api/refresh-token', authenticate, async (req, res) => {
+  try {
+    console.log('Refreshing token for user:', req.user);
+    
+    // Find the user in the appropriate collection based on current role
+    let user = null;
+    let newRole = null;
+    
+    if (req.user.role === 'client' || !req.user.role) {
+      user = await Client.findById(req.user.id);
+      if (user) newRole = 'client';
+    } else if (req.user.role === 'candidate') {
+      user = await Candidate.findById(req.user.id);
+      if (user) newRole = 'candidate';
+    } else if (req.user.role === 'admin') {
+      user = await Admin.findById(req.user.id);
+      if (user) newRole = 'admin';
+    }
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Create new token with correct role
+    const newToken = jwt.sign({ id: user._id, role: newRole }, JWT_SECRET, { expiresIn: '4h' });
+    
+    // Set new cookie
+    res.cookie('token', newToken, { 
+      httpOnly: true, 
+      maxAge: 14400000, // 4 hours in milliseconds
+      secure: true,
+      sameSite: 'none'
+    });
+    
+    console.log('Token refreshed with role:', newRole);
+    res.json({ 
+      message: 'Token refreshed successfully',
+      user: { id: user._id, role: newRole }
+    });
+  } catch (err) {
+    console.log('Error refreshing token:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // Auth middleware
 function authenticate(req, res, next) {
   const token = req.cookies.token;
