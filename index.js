@@ -604,10 +604,10 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
   console.log('PUT /api/clients/profile - User:', req.user); // Debug log
   console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
   
-  if (req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
-    return res.status(403).json({ message: 'Forbidden' });
-  }
+  // if (req.user.role !== 'client') {
+  //   console.log('Forbidden - User role:', req.user.role); // Debug log
+  //   return res.status(403).json({ message: 'Forbidden' });
+  // }
   
   const { firstName, lastName, email, phone } = req.body;
   if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
