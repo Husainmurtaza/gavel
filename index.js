@@ -65,6 +65,7 @@ app.get('/api/test-client-profile', authenticate, async (req, res) => {
   }
   try {
     const client = await Client.findById(req.user.id);
+    console.log('Client found in test:', client);
     if (!client) {
       return res.status(404).json({ message: 'Client not found in database' });
     }
@@ -79,6 +80,23 @@ app.get('/api/test-client-profile', authenticate, async (req, res) => {
       }
     });
   } catch (err) {
+    console.log('Error in test client profile:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Test route to check all clients in database
+app.get('/api/test-all-clients', async (req, res) => {
+  try {
+    const clients = await Client.find({}).select('firstName lastName email phone role _id');
+    console.log('All clients in database:', clients);
+    res.json({
+      message: 'All clients',
+      count: clients.length,
+      clients: clients
+    });
+  } catch (err) {
+    console.log('Error getting all clients:', err.message);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -100,18 +118,26 @@ function authenticate(req, res, next) {
 
 // Example protected route for client dashboard
 app.get('/api/protected/client', authenticate, async (req, res) => {
-  if (req.user.role !== 'client') return res.status(403).json({ message: 'Forbidden' });
+  console.log('GET /api/protected/client - User:', req.user); // Debug log
+  if (req.user.role !== 'client') {
+    console.log('Forbidden - User role:', req.user.role); // Debug log
+    return res.status(403).json({ message: 'Forbidden' });
+  }
   try {
     const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
+    console.log('Client found:', client); // Debug log
     if (!client) return res.status(404).json({ message: 'Client not found' });
-    res.json({ 
+    const response = { 
       id: client._id, 
       firstName: client.firstName, 
       lastName: client.lastName, 
       email: client.email, 
       phone: client.phone 
-    });
+    };
+    console.log('Sending response:', response); // Debug log
+    res.json(response);
   } catch (err) {
+    console.log('Error in /api/protected/client:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
