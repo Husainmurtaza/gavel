@@ -13,6 +13,10 @@ const Company = require('./models/company');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Add response compression
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://GavelDatabase:j5NmOUB8hi1LfBxI@gavelcluster.p7kueq8.mongodb.net/gavel?retryWrites=true&w=majority&appName=GavelCluster';
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
@@ -27,8 +31,14 @@ app.use(cors({
 }));
 app.use(cookieParser());
 
-// MongoDB Connection
-mongoose.connect(MONGO_URI)
+// MongoDB Connection with optimized settings
+mongoose.connect(MONGO_URI, {
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  bufferMaxEntries: 0,
+  bufferCommands: false
+})
   .then(() => {
     console.log('MongoDB connection successful');
   })
@@ -55,9 +65,21 @@ function authenticate(req, res, next) {
 }
 
 // Example protected route for client dashboard
-app.get('/api/protected/client', authenticate, (req, res) => {
+app.get('/api/protected/client', authenticate, async (req, res) => {
   if (req.user.role !== 'client') return res.status(403).json({ message: 'Forbidden' });
-  res.json({ message: 'Welcome to the client dashboard!' });
+  try {
+    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
+    if (!client) return res.status(404).json({ message: 'Client not found' });
+    res.json({ 
+      id: client._id, 
+      firstName: client.firstName, 
+      lastName: client.lastName, 
+      email: client.email, 
+      phone: client.phone 
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
 });
 
 // Example protected route for candidate dashboard
@@ -208,11 +230,14 @@ app.get('/api/protected/admin', authenticate, async (req, res) => {
   }
 });
 
-// GET positions: populate company
+// GET positions: populate company with optimized query
 app.get('/api/positions', authenticate, async (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'candidate') return res.status(403).json({ message: 'Forbidden' });
   try {
-    const positions = await Position.find({}, { name: 1, projectDescription: 1, company: 1, redFlag: 1 }).populate('company', 'name');
+    const positions = await Position.find({}, { name: 1, projectDescription: 1, company: 1, redFlag: 1 })
+      .populate('company', 'name')
+      .lean()
+      .limit(50); // Limit results for faster response
     res.json(positions.map(pos => ({
       id: pos._id,
       name: pos.name,
@@ -375,6 +400,37 @@ app.delete('/api/clients/:id', authenticate, async (req, res) => {
     const client = await Client.findByIdAndUpdate(req.params.id, { deleted: true });
     if (!client) return res.status(404).json({ message: 'Client not found.' });
     res.json({ message: 'Client deleted.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Client profile update route
+app.put('/api/clients/profile', authenticate, async (req, res) => {
+  if (req.user.role !== 'client') return res.status(403).json({ message: 'Forbidden' });
+  const { firstName, lastName, email, phone } = req.body;
+  if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
+  try {
+    // Check if email is already taken by another client
+    const existingClient = await Client.findOne({ email, _id: { $ne: req.user.id } });
+    if (existingClient) return res.status(409).json({ message: 'Email already exists.' });
+    
+    const client = await Client.findByIdAndUpdate(
+      req.user.id, 
+      { firstName, lastName, email, phone }, 
+      { new: true }
+    );
+    if (!client) return res.status(404).json({ message: 'Client not found.' });
+    res.json({ 
+      message: 'Profile updated successfully.',
+      client: {
+        id: client._id,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        email: client.email,
+        phone: client.phone
+      }
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
