@@ -36,8 +36,7 @@ mongoose.connect(MONGO_URI, {
   maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
-  bufferMaxEntries: 0,
-  bufferCommands: false
+  bufferMaxEntries: 0
 })
   .then(() => {
     console.log('MongoDB connection successful');
@@ -400,6 +399,26 @@ app.delete('/api/clients/:id', authenticate, async (req, res) => {
     const client = await Client.findByIdAndUpdate(req.params.id, { deleted: true });
     if (!client) return res.status(404).json({ message: 'Client not found.' });
     res.json({ message: 'Client deleted.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Client profile GET route
+app.get('/api/clients/profile', authenticate, async (req, res) => {
+  if (req.user.role !== 'client') return res.status(403).json({ message: 'Forbidden' });
+  try {
+    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
+    if (!client) return res.status(404).json({ message: 'Client not found.' });
+    res.json({ 
+      client: {
+        id: client._id,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        email: client.email,
+        phone: client.phone
+      }
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
