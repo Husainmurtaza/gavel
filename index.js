@@ -581,7 +581,7 @@ app.get('/api/clients', authenticate, async (req, res) => {
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
-    const clients = await Client.find({ deleted: { $ne: true } }, { firstName: 1, lastName: 1, email: 1, phone: 1, company: 1, redFlag: 1 }).populate('company', 'name');
+    const clients = await Client.find({}, { firstName: 1, lastName: 1, email: 1, phone: 1, company: 1, redFlag: 1 }).populate('company', 'name');
     res.json(clients.map(c => ({
       id: c._id,
       firstName: c.firstName,
@@ -628,7 +628,7 @@ app.put('/api/clients/:id', authenticate, async (req, res) => {
 app.delete('/api/clients/:id', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
   try {
-    const client = await Client.findByIdAndUpdate(req.params.id, { deleted: true });
+    const client = await Client.findByIdAndDelete(req.params.id);
     if (!client) return res.status(404).json({ message: 'Client not found.' });
     res.json({ message: 'Client deleted.' });
   } catch (err) {
@@ -703,7 +703,7 @@ app.get('/api/candidates', authenticate, async (req, res) => {
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
-    const candidates = await Candidate.find({ deleted: { $ne: true } }, { firstName: 1, lastName: 1, email: 1, phone: 1 });
+    const candidates = await Candidate.find({}, { firstName: 1, lastName: 1, email: 1, phone: 1 });
     res.json(candidates.map(c => ({ id: c._id, firstName: c.firstName, lastName: c.lastName, email: c.email, phone: c.phone })));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -807,7 +807,7 @@ app.put('/api/candidates/:id', authenticate, async (req, res) => {
 app.delete('/api/candidates/:id', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
   try {
-    const candidate = await Candidate.findByIdAndUpdate(req.params.id, { deleted: true });
+    const candidate = await Candidate.findByIdAndDelete(req.params.id);
     if (!candidate) return res.status(404).json({ message: 'Candidate not found.' });
     res.json({ message: 'Candidate deleted.' });
   } catch (err) {
