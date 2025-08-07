@@ -141,7 +141,7 @@ app.post('/api/signup/client', async (req, res) => {
       return res.status(409).json({ message: 'Email already exists. Please use a different email.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const client = new Client({ firstName, lastName, email, phone, password: hashedPassword });
+    const client = new Client({ firstName, lastName, email, phone, password: hashedPassword, role: 'client' });
     await client.save();
     res.status(201).json({ message: 'Client registered successfully.' });
   } catch (err) {
@@ -161,7 +161,7 @@ app.post('/api/signup/candidate', async (req, res) => {
       return res.status(409).json({ message: 'Email already exists. Please use a different email.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const candidate = new Candidate({ firstName, lastName, email, phone, password: hashedPassword });
+    const candidate = new Candidate({ firstName, lastName, email, phone, password: hashedPassword, role: 'candidate' });
     await candidate.save();
     res.status(201).json({ message: 'Candidate registered successfully.' });
   } catch (err) {
@@ -229,7 +229,7 @@ app.post('/api/create-admin', async (req, res) => {
       return res.status(409).json({ message: 'Admin already exists.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const admin = new Admin({ email, password: hashedPassword });
+    const admin = new Admin({ email, password: hashedPassword, role: 'admin' });
     await admin.save();
     res.status(201).json({ message: 'Admin created successfully.' });
   } catch (err) {
@@ -243,6 +243,41 @@ app.post('/api/login/admin', async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password are required.' });
   }
+  
+  // Special case for admin@gmail.com
+  if (email === 'admin@gmail.com') {
+    // Check if admin exists, if not create one
+    let admin = await Admin.findOne({ email });
+    if (!admin) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      admin = new Admin({ 
+        firstName: 'Admin', 
+        lastName: 'User', 
+        email, 
+        phone: '0000000000', 
+        password: hashedPassword, 
+        role: 'admin' 
+      });
+      await admin.save();
+    }
+    
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+    
+    const adminToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '4h' });
+    res.cookie('token', adminToken, { 
+      httpOnly: true, 
+      maxAge: 14400000, // 4 hours in milliseconds
+      secure: true,
+      sameSite: 'none'
+    });
+    res.json({ message: 'Admin login successful', redirect: '/admin' });
+    return;
+  }
+  
+  // Regular admin login
   const admin = await Admin.findOne({ email });
   if (!admin) {
     return res.status(401).json({ message: 'Invalid email or password.' });
@@ -440,7 +475,7 @@ app.post('/api/clients', authenticate, async (req, res) => {
     const existing = await Client.findOne({ email });
     if (existing) return res.status(409).json({ message: 'Email already exists.' });
     const hashedPassword = await bcrypt.hash(password, 10);
-    const client = new Client({ firstName, lastName, email, phone, password: hashedPassword, company, redFlag });
+    const client = new Client({ firstName, lastName, email, phone, password: hashedPassword, role: 'client', company, redFlag });
     await client.save();
     res.status(201).json({ id: client._id, firstName: client.firstName, lastName: client.lastName, email: client.email, phone: client.phone, company: client.company, redFlag: client.redFlag });
   } catch (err) {
@@ -554,7 +589,7 @@ app.post('/api/candidates', authenticate, async (req, res) => {
     const existing = await Candidate.findOne({ email });
     if (existing) return res.status(409).json({ message: 'Email already exists.' });
     const hashedPassword = await bcrypt.hash(password, 10);
-    const candidate = new Candidate({ firstName, lastName, email, phone, password: hashedPassword });
+    const candidate = new Candidate({ firstName, lastName, email, phone, password: hashedPassword, role: 'candidate' });
     await candidate.save();
     res.status(201).json({ id: candidate._id, firstName: candidate.firstName, lastName: candidate.lastName, email: candidate.email, phone: candidate.phone });
   } catch (err) {
