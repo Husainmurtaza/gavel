@@ -49,6 +49,14 @@ app.get('/', (req, res) => {
   res.send('Express server is running!');
 });
 
+// Test route to check authentication
+app.get('/api/test-auth', authenticate, (req, res) => {
+  res.json({ 
+    message: 'Authentication working', 
+    user: { id: req.user.id, role: req.user.role } 
+  });
+});
+
 // Auth middleware
 function authenticate(req, res, next) {
   const token = req.cookies.token;
@@ -56,8 +64,10 @@ function authenticate(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
+    console.log('Authenticated user:', { id: decoded.id, role: decoded.role }); // Debug log
     next();
   } catch (err) {
+    console.log('JWT verification failed:', err.message); // Debug log
     return res.status(401).json({ message: 'Session expired. Please login again.' });
   }
 }
@@ -181,6 +191,26 @@ app.post('/api/login/candidate', async (req, res) => {
   res.json({ message: 'Login successful', redirect: '/candidate' });
 });
 
+// Create admin route (for initial setup)
+app.post('/api/create-admin', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
+    const existing = await Admin.findOne({ email });
+    if (existing) {
+      return res.status(409).json({ message: 'Admin already exists.' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const admin = new Admin({ email, password: hashedPassword });
+    await admin.save();
+    res.status(201).json({ message: 'Admin created successfully.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // Login route for Admin
 app.post('/api/login/admin', async (req, res) => {
   const { email, password } = req.body;
@@ -207,6 +237,7 @@ app.post('/api/login/admin', async (req, res) => {
 
 // Logout route (destroy session)
 app.post('/api/logout', (req, res) => {
+  console.log('Logging out user'); // Debug log
   res.clearCookie('token', { 
     httpOnly: true, 
     secure: true,
@@ -230,7 +261,11 @@ app.get('/api/protected/admin', authenticate, async (req, res) => {
 
 // GET positions: populate company with optimized query
 app.get('/api/positions', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin' && req.user.role !== 'candidate') return res.status(403).json({ message: 'Forbidden' });
+  console.log('GET /api/positions - User:', req.user); // Debug log
+  if (req.user.role !== 'admin' && req.user.role !== 'candidate') {
+    console.log('Forbidden - User role:', req.user.role); // Debug log
+    return res.status(403).json({ message: 'Forbidden' });
+  }
   try {
     const positions = await Position.find({}, { name: 1, projectDescription: 1, company: 1, redFlag: 1 })
       .populate('company', 'name')
@@ -292,7 +327,11 @@ app.delete('/api/positions/:id', authenticate, async (req, res) => {
 
 // CRUD for Companies (admin only)
 app.get('/api/companies', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  console.log('GET /api/companies - User:', req.user); // Debug log
+  if (req.user.role !== 'admin') {
+    console.log('Forbidden - User role:', req.user.role); // Debug log
+    return res.status(403).json({ message: 'Forbidden' });
+  }
   try {
     const companies = await Company.find({}, { name: 1 });
     res.json(companies.map(c => ({ id: c._id, name: c.name })));
@@ -346,7 +385,11 @@ app.delete('/api/companies/:id', authenticate, async (req, res) => {
 
 // CRUD for Clients (admin only)
 app.get('/api/clients', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  console.log('GET /api/clients - User:', req.user); // Debug log
+  if (req.user.role !== 'admin') {
+    console.log('Forbidden - User role:', req.user.role); // Debug log
+    return res.status(403).json({ message: 'Forbidden' });
+  }
   try {
     const clients = await Client.find({ deleted: { $ne: true } }, { firstName: 1, lastName: 1, email: 1, phone: 1, company: 1, redFlag: 1 }).populate('company', 'name');
     res.json(clients.map(c => ({
@@ -456,7 +499,11 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
 
 // CRUD for Candidates (admin only)
 app.get('/api/candidates', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  console.log('GET /api/candidates - User:', req.user); // Debug log
+  if (req.user.role !== 'admin') {
+    console.log('Forbidden - User role:', req.user.role); // Debug log
+    return res.status(403).json({ message: 'Forbidden' });
+  }
   try {
     const candidates = await Candidate.find({ deleted: { $ne: true } }, { firstName: 1, lastName: 1, email: 1, phone: 1 });
     res.json(candidates.map(c => ({ id: c._id, firstName: c.firstName, lastName: c.lastName, email: c.email, phone: c.phone })));
