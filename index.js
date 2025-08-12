@@ -819,9 +819,39 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
       console.log('Role set to client for user:', req.user.id);
     }
     
-    res.json({ message: 'Client role ensured', role: 'client' });
+    // Get updated client data to confirm role was set
+    const updatedClient = await Client.findById(req.user.id);
+    console.log('Client after role update:', updatedClient);
+    
+    res.json({ 
+      message: 'Client role ensured', 
+      role: 'client',
+      clientId: req.user.id,
+      roleSet: updatedClient.role
+    });
   } catch (err) {
     console.error('Error ensuring client role:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Route to check client role from database (for debugging)
+app.get('/api/clients/check-role', authenticate, async (req, res) => {
+  try {
+    const client = await Client.findById(req.user.id);
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+    
+    res.json({
+      message: 'Client role check',
+      jwtRole: req.user.role,
+      dbRole: client.role,
+      clientId: req.user.id,
+      hasRole: !!client.role
+    });
+  } catch (err) {
+    console.error('Error checking client role:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -831,42 +861,49 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
   console.log('PUT /api/clients/profile - User:', req.user); // Debug log
   console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
   
-  // Check if user is a client or if role is missing (legacy users)
-  if (req.user.role && req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
-    return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
-  }
-  
-  const { firstName, lastName, email, phone } = req.body;
-  if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
   try {
+    // Check user's role from database instead of JWT token
+    const client = await Client.findById(req.user.id);
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found.' });
+    }
+    
+    // Check if user is a client or if role is missing (legacy users)
+    if (client.role && client.role !== 'client') {
+      console.log('Forbidden - User role from DB:', client.role); // Debug log
+      return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
+    }
+
+    const { firstName, lastName, email, phone } = req.body;
+    if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
+    
     // Check if email is already taken by another client
     const existingClient = await Client.findOne({ email, _id: { $ne: req.user.id } });
     if (existingClient) return res.status(409).json({ message: 'Email already exists.' });
     
     // Update the client profile and ensure role is set
     const updateData = { firstName, lastName, email, phone };
-    if (!req.user.role) {
+    if (!client.role) {
       updateData.role = 'client'; // Set role for legacy users
       console.log('Setting role to client for legacy user:', req.user.id);
     }
     
-    const client = await Client.findByIdAndUpdate(
+    const updatedClient = await Client.findByIdAndUpdate(
       req.user.id, 
       updateData, 
       { new: true }
     );
-    if (!client) return res.status(404).json({ message: 'Client not found.' });
+    if (!updatedClient) return res.status(404).json({ message: 'Client not found.' });
     
-    console.log('Client profile updated successfully:', client);
+    console.log('Client profile updated successfully:', updatedClient);
     res.json({ 
       message: 'Profile updated successfully.',
       client: {
-        id: client._id,
-        firstName: client.firstName,
-        lastName: client.lastName,
-        email: client.email,
-        phone: client.phone
+        id: updatedClient._id,
+        firstName: updatedClient.firstName,
+        lastName: updatedClient.lastName,
+        email: updatedClient.email,
+        phone: updatedClient.phone
       }
     });
   } catch (err) {
