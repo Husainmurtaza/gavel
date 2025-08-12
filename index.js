@@ -135,7 +135,7 @@ function authenticate(req, res, next) {
     return res.status(401).json({ message: 'Access token required' });
   }
   
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  const token = authHeader.substring(7);
   
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -151,12 +151,19 @@ function authenticate(req, res, next) {
 
 // Example protected route for client dashboard
 app.get('/api/protected/client', authenticate, async (req, res) => {
-  if (req.user.role !== 'client') {
-    return res.status(403).json({ message: 'Forbidden' });
-  }
   try {
-    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
-    if (!client) return res.status(404).json({ message: 'Client not found' });
+    // Check user's role from database instead of JWT token
+    const client = await Client.findById(req.user.id);
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+    
+    // Check if user is a client or if role is missing (legacy users)
+    if (client.role && client.role !== 'client') {
+      console.log('Forbidden - User role from DB:', client.role);
+      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
+    }
+    
     const response = { 
       id: client._id, 
       firstName: client.firstName, 
@@ -166,6 +173,7 @@ app.get('/api/protected/client', authenticate, async (req, res) => {
     };
     res.json(response);
   } catch (err) {
+    console.error('Error in protected client route:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
