@@ -27,9 +27,10 @@ const corsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',')
   : [
       'http://localhost:5173',        // Local development
+      'http://localhost:3000',        // Alternative local port
       'http://31.97.232.40:5000',    // Live server
-      'https://joingavel.com',
-      'https://www.joingavel.com'
+      'https://joingavel.com',        // Live frontend
+      'https://www.joingavel.com'     // Live frontend www
     ];
 
 app.use(cors({
@@ -182,11 +183,13 @@ app.post('/api/refresh-token', authenticate, async (req, res) => {
     const newToken = jwt.sign({ id: user._id, role: newRole }, JWT_SECRET, { expiresIn: '4h' });
     
     // Set new cookie
+    const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
     res.cookie('token', newToken, { 
       httpOnly: true, 
       maxAge: 14400000, // 4 hours in milliseconds
-      secure: false,
-      sameSite: 'lax'
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      path: '/'
     });
     
     console.log('Token refreshed with role:', newRole);
@@ -314,12 +317,14 @@ app.post('/api/login/client', async (req, res) => {
   }
   const clientToken = jwt.sign({ id: client._id, role: 'client' }, JWT_SECRET, { expiresIn: '4h' });
   
-  // Cookie settings for localhost development
+  // Smart cookie settings based on origin
+  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
   res.cookie('token', clientToken, { 
     httpOnly: true, 
     maxAge: 14400000, // 4 hours in milliseconds
-    secure: false,
-    sameSite: 'lax'
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/'
   });
   res.json({ message: 'Login successful', redirect: '/dashboard' });
 });
@@ -340,12 +345,14 @@ app.post('/api/login/candidate', async (req, res) => {
   }
   const candidateToken = jwt.sign({ id: candidate._id, role: 'candidate' }, JWT_SECRET, { expiresIn: '4h' });
   
-  // Cookie settings for localhost development
+  // Smart cookie settings based on origin
+  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
   res.cookie('token', candidateToken, { 
     httpOnly: true, 
     maxAge: 14400000, // 4 hours in milliseconds
-    secure: false,
-    sameSite: 'lax'
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/'
   });
   res.json({ message: 'Login successful', redirect: '/candidate' });
 });
@@ -401,12 +408,14 @@ app.post('/api/login/admin', async (req, res) => {
     
     const adminToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '4h' });
     
-    // Cookie settings for localhost development
+    // Smart cookie settings based on origin
+    const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
     res.cookie('token', adminToken, { 
       httpOnly: true, 
       maxAge: 14400000, // 4 hours in milliseconds
-      secure: false,
-      sameSite: 'lax'
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      path: '/'
     });
     res.json({ message: 'Admin login successful', redirect: '/admin' });
     return;
@@ -423,22 +432,26 @@ app.post('/api/login/admin', async (req, res) => {
   }
   const adminToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '4h' });
   
-  // Cookie settings for localhost development
+  // Smart cookie settings based on origin
+  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
   res.cookie('token', adminToken, { 
     httpOnly: true, 
     maxAge: 14400000, // 4 hours in milliseconds
-    secure: false,
-    sameSite: 'lax'
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/'
   });
   res.json({ message: 'Admin login successful', redirect: '/admin' });
 });
 
 // Logout route (destroy session)
 app.post('/api/logout', (req, res) => {
+  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
   res.clearCookie('token', { 
     httpOnly: true, 
-    secure: false,
-    sameSite: 'lax'
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/'
   });
   res.json({ message: 'Logged out successfully' });
 });
