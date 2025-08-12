@@ -155,67 +155,64 @@ app.get('/api/test-all-candidates', async (req, res) => {
   }
 });
 
-// Route to refresh JWT token with correct role from database
-app.post('/api/refresh-token', authenticate, async (req, res) => {
+// Route to refresh access token using refresh token
+app.post('/api/refresh-token', async (req, res) => {
   try {
-    console.log('Refreshing token for user:', req.user);
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({ message: 'Refresh token not found' });
+    }
     
-    // Find the user in the appropriate collection based on current role
+    // Verify refresh token
+    const decoded = jwt.verify(refreshToken, JWT_SECRET);
+    
+    // Find the user in the appropriate collection based on role
     let user = null;
-    let newRole = null;
+    let role = decoded.role;
     
-    if (req.user.role === 'client' || !req.user.role) {
-      user = await Client.findById(req.user.id);
-      if (user) newRole = 'client';
-    } else if (req.user.role === 'candidate') {
-      user = await Candidate.findById(req.user.id);
-      if (user) newRole = 'candidate';
-    } else if (req.user.role === 'admin') {
-      user = await Admin.findById(req.user.id);
-      if (user) newRole = 'admin';
+    if (role === 'client') {
+      user = await Client.findById(decoded.id);
+    } else if (role === 'candidate') {
+      user = await Candidate.findById(decoded.id);
+    } else if (role === 'admin') {
+      user = await Admin.findById(decoded.id);
     }
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Create new token with correct role
-    const newToken = jwt.sign({ id: user._id, role: newRole }, JWT_SECRET, { expiresIn: '4h' });
+    // Generate new access token
+    const newAccessToken = jwt.sign({ id: user._id, role: role }, JWT_SECRET, { expiresIn: '15m' });
     
-    // Set new cookie
-    const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
-    res.cookie('token', newToken, { 
-      httpOnly: true, 
-      maxAge: 14400000, // 4 hours in milliseconds
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      path: '/'
-    });
-    
-    console.log('Token refreshed with role:', newRole);
     res.json({ 
       message: 'Token refreshed successfully',
-      user: { id: user._id, role: newRole }
+      accessToken: newAccessToken,
+      user: { id: user._id, role: role }
     });
   } catch (err) {
-    console.log('Error refreshing token:', err.message);
-    res.status(500).json({ message: 'Server error', error: err.message });
+    return res.status(401).json({ message: 'Invalid refresh token' });
   }
 });
 
-// Auth middleware
+// Auth middleware - checks Authorization header for access token
 function authenticate(req, res, next) {
-  const token = req.cookies.token;
-  if (!token) {
-    return res.status(401).json({ message: 'Session expired. Please login again.' });
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Access token required' });
   }
+  
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
   
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ message: 'Session expired. Please login again.' });
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired', code: 'TOKEN_EXPIRED' });
+    }
+    return res.status(401).json({ message: 'Invalid token' });
   }
 }
 
@@ -315,18 +312,28 @@ app.post('/api/login/client', async (req, res) => {
   if (!isMatch) {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
-  const clientToken = jwt.sign({ id: client._id, role: 'client' }, JWT_SECRET, { expiresIn: '4h' });
   
-  // Smart cookie settings based on origin
+  // Generate access token (short-lived) and refresh token (long-lived)
+  const accessToken = jwt.sign({ id: client._id, role: 'client' }, JWT_SECRET, { expiresIn: '15m' });
+  const refreshToken = jwt.sign({ id: client._id, role: 'client' }, JWT_SECRET, { expiresIn: '7d' });
+  
+  // Set refresh token as HTTP-only cookie
   const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
-  res.cookie('token', clientToken, { 
+  res.cookie('refreshToken', refreshToken, { 
     httpOnly: true, 
-    maxAge: 14400000, // 4 hours in milliseconds
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'lax',
     path: '/'
   });
-  res.json({ message: 'Login successful', redirect: '/dashboard' });
+  
+  // Return access token in response body
+  res.json({ 
+    message: 'Login successful', 
+    redirect: '/dashboard',
+    accessToken,
+    user: { id: client._id, role: 'client', firstName: client.firstName, lastName: client.lastName }
+  });
 });
 
 // Login route for Candidate
@@ -343,18 +350,28 @@ app.post('/api/login/candidate', async (req, res) => {
   if (!isMatch) {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
-  const candidateToken = jwt.sign({ id: candidate._id, role: 'candidate' }, JWT_SECRET, { expiresIn: '4h' });
   
-  // Smart cookie settings based on origin
+  // Generate access token (short-lived) and refresh token (long-lived)
+  const accessToken = jwt.sign({ id: candidate._id, role: 'candidate' }, JWT_SECRET, { expiresIn: '15m' });
+  const refreshToken = jwt.sign({ id: candidate._id, role: 'candidate' }, JWT_SECRET, { expiresIn: '7d' });
+  
+  // Set refresh token as HTTP-only cookie
   const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
-  res.cookie('token', candidateToken, { 
+  res.cookie('refreshToken', refreshToken, { 
     httpOnly: true, 
-    maxAge: 14400000, // 4 hours in milliseconds
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'lax',
     path: '/'
   });
-  res.json({ message: 'Login successful', redirect: '/candidate' });
+  
+  // Return access token in response body
+  res.json({ 
+    message: 'Login successful', 
+    redirect: '/candidate',
+    accessToken,
+    user: { id: candidate._id, role: 'candidate', firstName: candidate.firstName, lastName: candidate.lastName }
+  });
 });
 
 // Create admin route (for initial setup)
@@ -406,18 +423,27 @@ app.post('/api/login/admin', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
     
-    const adminToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '4h' });
+    // Generate access token (short-lived) and refresh token (long-lived)
+    const accessToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
     
-    // Smart cookie settings based on origin
+    // Set refresh token as HTTP-only cookie
     const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
-    res.cookie('token', adminToken, { 
+    res.cookie('refreshToken', refreshToken, { 
       httpOnly: true, 
-      maxAge: 14400000, // 4 hours in milliseconds
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       secure: isProduction,
       sameSite: isProduction ? 'none' : 'lax',
       path: '/'
     });
-    res.json({ message: 'Admin login successful', redirect: '/admin' });
+    
+    // Return access token in response body
+    res.json({ 
+      message: 'Admin login successful', 
+      redirect: '/admin',
+      accessToken,
+      user: { id: admin._id, role: 'admin', firstName: admin.firstName, lastName: admin.lastName }
+    });
     return;
   }
   
@@ -430,24 +456,33 @@ app.post('/api/login/admin', async (req, res) => {
   if (!isMatch) {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
-  const adminToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '4h' });
+  // Generate access token (short-lived) and refresh token (long-lived)
+  const accessToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '15m' });
+  const refreshToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
   
-  // Smart cookie settings based on origin
+  // Set refresh token as HTTP-only cookie
   const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
-  res.cookie('token', adminToken, { 
+  res.cookie('refreshToken', refreshToken, { 
     httpOnly: true, 
-    maxAge: 14400000, // 4 hours in milliseconds
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'lax',
     path: '/'
   });
-  res.json({ message: 'Admin login successful', redirect: '/admin' });
+  
+  // Return access token in response body
+  res.json({ 
+    message: 'Admin login successful', 
+    redirect: '/admin',
+    accessToken,
+    user: { id: admin._id, role: 'admin', firstName: admin.firstName, lastName: admin.lastName }
+  });
 });
 
 // Logout route (destroy session)
 app.post('/api/logout', (req, res) => {
   const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
-  res.clearCookie('token', { 
+  res.clearCookie('refreshToken', { 
     httpOnly: true, 
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'lax',
