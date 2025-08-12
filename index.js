@@ -661,8 +661,7 @@ app.delete('/api/clients/:id', authenticate, async (req, res) => {
 // Client profile GET route
 app.get('/api/clients/profile', authenticate, async (req, res) => {
   try {
-    // Check user's role from database instead of JWT token
-    const client = await Client.findById(req.user.id);
+    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id role');
     if (!client) {
       return res.status(404).json({ message: 'Client not found.' });
     }
@@ -700,18 +699,11 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
     // If role is missing, set it to client
     if (!req.user.role) {
       await Client.findByIdAndUpdate(req.user.id, { role: 'client' });
-      console.log('Role set to client for user:', req.user.id);
     }
-    
-    // Get updated client data to confirm role was set
-    const updatedClient = await Client.findById(req.user.id);
-    console.log('Client after role update:', updatedClient);
     
     res.json({ 
       message: 'Client role ensured', 
-      role: 'client',
-      clientId: req.user.id,
-      roleSet: updatedClient.role
+      role: 'client'
     });
   } catch (err) {
     console.error('Error ensuring client role:', err);
@@ -723,25 +715,12 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
 
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
-  console.log('=== CLIENT PROFILE UPDATE START ===');
-  console.log('PUT /api/clients/profile - User from JWT:', req.user);
-  console.log('PUT /api/clients/profile - Body:', req.body);
-  console.log('PUT /api/clients/profile - Headers:', req.headers);
-  
   try {
     // Check user's role from database instead of JWT token
-    console.log('Fetching client from database with ID:', req.user.id);
     const client = await Client.findById(req.user.id);
-    console.log('Client found in database:', client);
-    
     if (!client) {
-      console.log('Client not found in database');
       return res.status(404).json({ message: 'Client not found.' });
     }
-    
-    console.log('Client role from database:', client.role);
-    console.log('Client role type:', typeof client.role);
-    console.log('Client role === "client":', client.role === 'client');
     
     // Check if user is a client or if role is missing (legacy users)
     if (client.role && client.role !== 'client') {
@@ -760,7 +739,6 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
     const updateData = { firstName, lastName, email, phone };
     if (!client.role) {
       updateData.role = 'client'; // Set role for legacy users
-      console.log('Setting role to client for legacy user:', req.user.id);
     }
     
     const updatedClient = await Client.findByIdAndUpdate(
@@ -770,7 +748,6 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
     );
     if (!updatedClient) return res.status(404).json({ message: 'Client not found.' });
     
-    console.log('Client profile updated successfully:', updatedClient);
     res.json({ 
       message: 'Profile updated successfully.',
       client: {
@@ -782,7 +759,7 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
       }
     });
   } catch (err) {
-    console.log('Error in client profile update:', err.message); // Debug log
+    console.error('Error in client profile update:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
