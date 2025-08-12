@@ -563,7 +563,7 @@ app.get('/api/protected/admin', authenticate, async (req, res) => {
 // GET positions: populate company with optimized query
 app.get('/api/positions', authenticate, async (req, res) => {
   console.log('GET /api/positions - User:', req.user); // Debug log
-  if (req.user.role !== 'admin' && req.user.role !== 'candidate') {
+  if (req.user.role !== 'admin' && req.user.role !== 'candidate' && req.user.role !== 'client') {
     console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
@@ -1022,6 +1022,29 @@ app.get('/api/interviews/:id', authenticate, async (req, res) => {
     }
     res.json(interview);
   } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Client: Get interviews for positions related to client's company
+app.get('/api/client/interviews', authenticate, async (req, res) => {
+  console.log('GET /api/client/interviews - User:', req.user);
+  if (req.user.role !== 'client') return res.status(403).json({ message: 'Forbidden' });
+  try {
+    // Get client info to find their company
+    const client = await Client.findById(req.user.id);
+    console.log('Client found:', client);
+    if (!client) return res.status(404).json({ message: 'Client not found' });
+    
+    // Get all interviews
+    const interviews = await Interview.find({}).sort({ createdAt: -1 });
+    console.log('Interviews found:', interviews.length);
+    
+    // For now, return all interviews. In the future, this can be filtered by company
+    // when the business logic is more defined
+    res.json(interviews);
+  } catch (err) {
+    console.error('Error in client interviews:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
