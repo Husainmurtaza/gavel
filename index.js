@@ -56,17 +56,7 @@ app.get('/', (req, res) => {
   res.send('Express server is running!');
 });
 
-// Debug route to check cookies
-app.get('/api/debug/cookies', (req, res) => {
-  console.log('Cookies received:', req.cookies);
-  console.log('Headers:', req.headers);
-  res.json({ 
-    cookies: req.cookies,
-    hasToken: !!req.cookies.token,
-    userAgent: req.headers['user-agent'],
-    origin: req.headers.origin
-  });
-});
+
 
 // Test route to check authentication
 app.get('/api/test-auth', authenticate, (req, res) => {
@@ -192,11 +182,13 @@ app.post('/api/refresh-token', authenticate, async (req, res) => {
     const newToken = jwt.sign({ id: user._id, role: newRole }, JWT_SECRET, { expiresIn: '4h' });
     
     // Set new cookie
+    const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('token', newToken, { 
       httpOnly: true, 
       maxAge: 14400000, // 4 hours in milliseconds
-      secure: true,
-      sameSite: 'none'
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      domain: isProduction ? undefined : undefined
     });
     
     console.log('Token refreshed with role:', newRole);
@@ -212,36 +204,27 @@ app.post('/api/refresh-token', authenticate, async (req, res) => {
 
 // Auth middleware
 function authenticate(req, res, next) {
-  console.log('Auth middleware - Cookies:', req.cookies);
-  console.log('Auth middleware - Headers:', req.headers);
-  
   const token = req.cookies.token;
   if (!token) {
-    console.log('No token found in cookies');
     return res.status(401).json({ message: 'Session expired. Please login again.' });
   }
   
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
-    console.log('Authenticated user:', { id: decoded.id, role: decoded.role }); // Debug log
     next();
   } catch (err) {
-    console.log('JWT verification failed:', err.message); // Debug log
     return res.status(401).json({ message: 'Session expired. Please login again.' });
   }
 }
 
 // Example protected route for client dashboard
 app.get('/api/protected/client', authenticate, async (req, res) => {
-  console.log('GET /api/protected/client - User:', req.user); // Debug log
   if (req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
     const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
-    console.log('Client found:', client); // Debug log
     if (!client) return res.status(404).json({ message: 'Client not found' });
     const response = { 
       id: client._id, 
@@ -250,24 +233,19 @@ app.get('/api/protected/client', authenticate, async (req, res) => {
       email: client.email, 
       phone: client.phone 
     };
-    console.log('Sending response:', response); // Debug log
     res.json(response);
   } catch (err) {
-    console.log('Error in /api/protected/client:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
 // Example protected route for candidate dashboard
 app.get('/api/protected/candidate', authenticate, async (req, res) => {
-  console.log('GET /api/protected/candidate - User:', req.user); // Debug log
   if (req.user.role !== 'candidate') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
     const candidate = await Candidate.findById(req.user.id).select('firstName lastName email phone _id');
-    console.log('Candidate found:', candidate); // Debug log
     if (!candidate) return res.status(404).json({ message: 'Candidate not found' });
     const response = { 
       id: candidate._id, 
@@ -276,10 +254,8 @@ app.get('/api/protected/candidate', authenticate, async (req, res) => {
       email: candidate.email, 
       phone: candidate.phone 
     };
-    console.log('Sending response:', response); // Debug log
     res.json(response);
   } catch (err) {
-    console.log('Error in /api/protected/candidate:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -342,13 +318,13 @@ app.post('/api/login/client', async (req, res) => {
   
   // Cookie settings that work for both local and production
   const isProduction = process.env.NODE_ENV === 'production';
-  console.log('Setting client cookie - Production:', isProduction, 'Secure:', isProduction, 'SameSite:', isProduction ? 'none' : 'lax');
   
   res.cookie('token', clientToken, { 
     httpOnly: true, 
     maxAge: 14400000, // 4 hours in milliseconds
     secure: isProduction, // Only use secure in production
-    sameSite: isProduction ? 'none' : 'lax' // Use 'none' only in production
+    sameSite: isProduction ? 'none' : 'lax', // Use 'none' only in production
+    domain: isProduction ? undefined : undefined // Allow all domains in development
   });
   res.json({ message: 'Login successful', redirect: '/dashboard' });
 });
@@ -371,13 +347,13 @@ app.post('/api/login/candidate', async (req, res) => {
   
   // Cookie settings that work for both local and production
   const isProduction = process.env.NODE_ENV === 'production';
-  console.log('Setting candidate cookie - Production:', isProduction, 'Secure:', isProduction, 'SameSite:', isProduction ? 'none' : 'lax');
   
   res.cookie('token', candidateToken, { 
     httpOnly: true, 
     maxAge: 14400000, // 4 hours in milliseconds
     secure: isProduction, // Only use secure in production
-    sameSite: isProduction ? 'none' : 'lax' // Use 'none' only in production
+    sameSite: isProduction ? 'none' : 'lax', // Use 'none' only in production
+    domain: isProduction ? undefined : undefined // Allow all domains in development
   });
   res.json({ message: 'Login successful', redirect: '/candidate' });
 });
@@ -435,13 +411,13 @@ app.post('/api/login/admin', async (req, res) => {
     
     // Cookie settings that work for both local and production
     const isProduction = process.env.NODE_ENV === 'production';
-    console.log('Setting admin cookie - Production:', isProduction, 'Secure:', isProduction, 'SameSite:', isProduction ? 'none' : 'lax');
     
     res.cookie('token', adminToken, { 
       httpOnly: true, 
       maxAge: 14400000, // 4 hours in milliseconds
       secure: isProduction, // Only use secure in production
-      sameSite: isProduction ? 'none' : 'lax' // Use 'none' only in production
+      sameSite: isProduction ? 'none' : 'lax', // Use 'none' only in production
+      domain: isProduction ? undefined : undefined // Allow all domains in development
     });
     res.json({ message: 'Admin login successful', redirect: '/admin' });
     return;
@@ -460,20 +436,19 @@ app.post('/api/login/admin', async (req, res) => {
   
   // Cookie settings that work for both local and production
   const isProduction = process.env.NODE_ENV === 'production';
-  console.log('Setting admin cookie - Production:', isProduction, 'Secure:', isProduction, 'SameSite:', isProduction ? 'none' : 'lax');
   
   res.cookie('token', adminToken, { 
     httpOnly: true, 
     maxAge: 14400000, // 4 hours in milliseconds
     secure: isProduction, // Only use secure in production
-    sameSite: isProduction ? 'none' : 'lax' // Use 'none' only in production
+    sameSite: isProduction ? 'none' : 'lax', // Use 'none' only in production
+    domain: isProduction ? undefined : undefined // Allow all domains in development
   });
   res.json({ message: 'Admin login successful', redirect: '/admin' });
 });
 
 // Logout route (destroy session)
 app.post('/api/logout', (req, res) => {
-  console.log('Logging out user'); // Debug log
   const isProduction = process.env.NODE_ENV === 'production';
   res.clearCookie('token', { 
     httpOnly: true, 
