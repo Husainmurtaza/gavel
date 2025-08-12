@@ -777,13 +777,34 @@ app.get('/api/clients/profile', authenticate, async (req, res) => {
   }
 });
 
+// Route to ensure client role is set (for legacy users)
+app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
+  try {
+    // Check if user is a client or if role is missing (legacy users)
+    if (req.user.role && req.user.role !== 'client') {
+      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
+    }
+    
+    // If role is missing, set it to client
+    if (!req.user.role) {
+      await Client.findByIdAndUpdate(req.user.id, { role: 'client' });
+      console.log('Role set to client for user:', req.user.id);
+    }
+    
+    res.json({ message: 'Client role ensured', role: 'client' });
+  } catch (err) {
+    console.error('Error ensuring client role:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
   console.log('PUT /api/clients/profile - User:', req.user); // Debug log
   console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
   
-  // Check if user is a client
-  if (req.user.role !== 'client') {
+  // Check if user is a client or if role is missing (legacy users)
+  if (req.user.role && req.user.role !== 'client') {
     console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
   }
@@ -795,10 +816,16 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
     const existingClient = await Client.findOne({ email, _id: { $ne: req.user.id } });
     if (existingClient) return res.status(409).json({ message: 'Email already exists.' });
     
-    // Update the client profile
+    // Update the client profile and ensure role is set
+    const updateData = { firstName, lastName, email, phone };
+    if (!req.user.role) {
+      updateData.role = 'client'; // Set role for legacy users
+      console.log('Setting role to client for legacy user:', req.user.id);
+    }
+    
     const client = await Client.findByIdAndUpdate(
       req.user.id, 
-      { firstName, lastName, email, phone }, 
+      updateData, 
       { new: true }
     );
     if (!client) return res.status(404).json({ message: 'Client not found.' });
