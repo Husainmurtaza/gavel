@@ -82,6 +82,34 @@ app.post('/api/fix-user-roles', async (req, res) => {
   }
 });
 
+// Route to fix client roles specifically (for admin use)
+app.post('/api/fix-client-roles', async (req, res) => {
+  try {
+    // Fix all clients without roles
+    const clientsWithoutRole = await Client.updateMany(
+      { role: { $exists: false } },
+      { $set: { role: 'client' } }
+    );
+    
+    // Also fix clients with null/undefined roles
+    const clientsWithNullRole = await Client.updateMany(
+      { $or: [{ role: null }, { role: undefined }, { role: '' }] },
+      { $set: { role: 'client' } }
+    );
+    
+    res.json({ 
+      message: 'Client roles fixed successfully',
+      clientsFixed: clientsWithoutRole.modifiedCount + clientsWithNullRole.modifiedCount,
+      details: {
+        withoutRole: clientsWithoutRole.modifiedCount,
+        withNullRole: clientsWithNullRole.modifiedCount
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // Route to check user roles for debugging
 app.get('/api/debug/user-roles', async (req, res) => {
   try {
