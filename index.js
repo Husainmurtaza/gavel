@@ -138,8 +138,9 @@ app.get('/api/test-auth', authenticate, (req, res) => {
 // Test client profile route
 app.get('/api/test-client-profile', authenticate, async (req, res) => {
   console.log('Test client profile - User:', req.user);
-  if (req.user.role !== 'client') {
-    return res.status(403).json({ message: 'Forbidden - Not a client' });
+  const client = await Client.findById(req.user.id);
+  if (client.role && client.role !== 'client') {
+    return res.status(403).json({ message: 'Forbidden' });
   }
   try {
     const client = await Client.findById(req.user.id);
@@ -286,7 +287,8 @@ function authenticate(req, res, next) {
 
 // Example protected route for client dashboard
 app.get('/api/protected/client', authenticate, async (req, res) => {
-  if (req.user.role !== 'client') {
+  const client = await Client.findById(req.user.id);
+  if (client.role && client.role !== 'client') {
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
@@ -858,19 +860,29 @@ app.get('/api/clients/check-role', authenticate, async (req, res) => {
 
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
-  console.log('PUT /api/clients/profile - User:', req.user); // Debug log
-  console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
+  console.log('=== CLIENT PROFILE UPDATE START ===');
+  console.log('PUT /api/clients/profile - User from JWT:', req.user);
+  console.log('PUT /api/clients/profile - Body:', req.body);
+  console.log('PUT /api/clients/profile - Headers:', req.headers);
   
   try {
     // Check user's role from database instead of JWT token
+    console.log('Fetching client from database with ID:', req.user.id);
     const client = await Client.findById(req.user.id);
+    console.log('Client found in database:', client);
+    
     if (!client) {
+      console.log('Client not found in database');
       return res.status(404).json({ message: 'Client not found.' });
     }
     
+    console.log('Client role from database:', client.role);
+    console.log('Client role type:', typeof client.role);
+    console.log('Client role === "client":', client.role === 'client');
+    
     // Check if user is a client or if role is missing (legacy users)
     if (client.role && client.role !== 'client') {
-      console.log('Forbidden - User role from DB:', client.role); // Debug log
+      console.log('Forbidden - User role from DB:', client.role);
       return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
     }
 
