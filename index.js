@@ -789,7 +789,10 @@ app.delete('/api/clients/:id', authenticate, async (req, res) => {
 
 // Client profile GET route
 app.get('/api/clients/profile', authenticate, async (req, res) => {
-  if (req.user.role !== 'client') return res.status(403).json({ message: 'Forbidden' });
+  const client = await Client.findById(req.user.id);
+if (client.role && client.role !== 'client') {
+  return res.status(403).json({ message: 'Forbidden' });
+}
   try {
     const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
     if (!client) return res.status(404).json({ message: 'Client not found.' });
