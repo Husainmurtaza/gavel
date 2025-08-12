@@ -660,20 +660,16 @@ app.delete('/api/clients/:id', authenticate, async (req, res) => {
 
 // Client profile GET route
 app.get('/api/clients/profile', authenticate, async (req, res) => {
+  console.log('GET /api/clients/profile - User:', req.user); // Debug log
+  if (req.user.role !== 'client') {
+    console.log('Forbidden - User role:', req.user.role); // Debug log
+    return res.status(403).json({ message: 'Forbidden' });
+  }
   try {
-    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id role');
-    if (!client) {
-      return res.status(404).json({ message: 'Client not found.' });
-    }
-    
-    // Check if user is a client or if role is missing (legacy users)
-    if (client.role && client.role !== 'client') {
-      console.log('Forbidden - User role from DB:', client.role);
-      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
-    }
-    
-    // Return client profile data
-    res.json({ 
+    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
+    console.log('Client found:', client); // Debug log
+    if (!client) return res.status(404).json({ message: 'Client not found.' });
+    const response = { 
       client: {
         id: client._id,
         firstName: client.firstName,
@@ -681,9 +677,11 @@ app.get('/api/clients/profile', authenticate, async (req, res) => {
         email: client.email,
         phone: client.phone
       }
-    });
+    };
+    console.log('Sending response:', response); // Debug log
+    res.json(response);
   } catch (err) {
-    console.error('Error in client profile GET:', err);
+    console.log('Error in /api/clients/profile:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -715,71 +713,43 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
 
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
-  console.log('=== CLIENT PROFILE UPDATE START ===');
-  console.log('PUT /api/clients/profile - User from JWT:', req.user);
-  console.log('PUT /api/clients/profile - JWT role:', req.user.role);
-  console.log('PUT /api/clients/profile - Body:', req.body);
+  console.log('PUT /api/clients/profile - User:', req.user); // Debug log
+  console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
   
+  // Check if user is a client
+  if (req.user.role !== 'client') {
+    console.log('Forbidden - User role:', req.user.role); // Debug log
+    return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
+  }
+  
+  const { firstName, lastName, email, phone } = req.body;
+  if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
   try {
-    // Check user's role from database instead of JWT token
-    console.log('Fetching client from database with ID:', req.user.id);
-    const client = await Client.findById(req.user.id);
-    console.log('Client found in database:', client);
-    
-    if (!client) {
-      console.log('Client not found in database');
-      return res.status(404).json({ message: 'Client not found.' });
-    }
-    
-    console.log('Client role from database:', client.role);
-    console.log('Client role type:', typeof client.role);
-    console.log('Client role === "client":', client.role === 'client');
-    console.log('Client role !== "client":', client.role !== 'client');
-    
-    // Check if user is a client or if role is missing (legacy users)
-    if (client.role && client.role !== 'client') {
-      console.log('Forbidden - User role from DB:', client.role);
-      return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
-    }
-
-    console.log('Role check passed, proceeding with update...');
-
-    const { firstName, lastName, email, phone } = req.body;
-    if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
-    
     // Check if email is already taken by another client
     const existingClient = await Client.findOne({ email, _id: { $ne: req.user.id } });
     if (existingClient) return res.status(409).json({ message: 'Email already exists.' });
     
-    // Update the client profile and ensure role is set
-    const updateData = { firstName, lastName, email, phone };
-    if (!client.role) {
-      updateData.role = 'client'; // Set role for legacy users
-      console.log('Setting role to client for legacy user:', req.user.id);
-    }
-    
-    console.log('Update data:', updateData);
-    
-    const updatedClient = await Client.findByIdAndUpdate(
+    // Update the client profile
+    const client = await Client.findByIdAndUpdate(
       req.user.id, 
-      updateData, 
+      { firstName, lastName, email, phone }, 
       { new: true }
     );
-    if (!updatedClient) return res.status(404).json({ message: 'Client not found.' });
+    if (!client) return res.status(404).json({ message: 'Client not found.' });
     
-    console.log('Client profile updated successfully:', updatedClient);
+    console.log('Client profile updated successfully:', client);
     res.json({ 
       message: 'Profile updated successfully.',
       client: {
-        id: updatedClient._id,
-        firstName: updatedClient.firstName,
-        lastName: updatedClient.lastName,
-        email: updatedClient.email,
-        phone: updatedClient.phone
+        id: client._id,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        email: client.email,
+        phone: client.phone
       }
     });
   } catch (err) {
-    console.error('Error in client profile update:', err);
+    console.log('Error in client profile update:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
