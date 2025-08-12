@@ -56,6 +56,18 @@ app.get('/', (req, res) => {
   res.send('Express server is running!');
 });
 
+// Debug route to check cookies
+app.get('/api/debug/cookies', (req, res) => {
+  console.log('Cookies received:', req.cookies);
+  console.log('Headers:', req.headers);
+  res.json({ 
+    cookies: req.cookies,
+    hasToken: !!req.cookies.token,
+    userAgent: req.headers['user-agent'],
+    origin: req.headers.origin
+  });
+});
+
 // Test route to check authentication
 app.get('/api/test-auth', authenticate, (req, res) => {
   res.json({ 
