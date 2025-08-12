@@ -57,6 +57,46 @@ app.get('/', (req, res) => {
   res.send('Express server is running!');
 });
 
+// Route to fix existing users without roles (run once to fix existing data)
+app.post('/api/fix-user-roles', async (req, res) => {
+  try {
+    // Fix clients without roles
+    const clientsWithoutRole = await Client.updateMany(
+      { role: { $exists: false } },
+      { $set: { role: 'client' } }
+    );
+    
+    // Fix candidates without roles
+    const candidatesWithoutRole = await Candidate.updateMany(
+      { role: { $exists: false } },
+      { $set: { role: 'candidate' } }
+    );
+    
+    res.json({ 
+      message: 'User roles fixed successfully',
+      clientsFixed: clientsWithoutRole.modifiedCount,
+      candidatesFixed: candidatesWithoutRole.modifiedCount
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Route to check user roles for debugging
+app.get('/api/debug/user-roles', async (req, res) => {
+  try {
+    const clients = await Client.find({}, { email: 1, role: 1, firstName: 1, lastName: 1 });
+    const candidates = await Candidate.find({}, { email: 1, role: 1, firstName: 1, lastName: 1 });
+    
+    res.json({
+      clients: clients.map(c => ({ email: c.email, role: c.role, name: `${c.firstName} ${c.lastName}` })),
+      candidates: candidates.map(c => ({ email: c.email, role: c.role, name: `${c.firstName} ${c.lastName}` }))
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 
 
 // Test route to check authentication
@@ -270,7 +310,15 @@ app.post('/api/signup/client', async (req, res) => {
       return res.status(409).json({ message: 'Email already exists. Please use a different email.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const client = new Client({ firstName, lastName, email, phone, password: hashedPassword, role: 'client' });
+    // Ensure role is explicitly set to 'client'
+    const client = new Client({ 
+      firstName, 
+      lastName, 
+      email, 
+      phone, 
+      password: hashedPassword, 
+      role: 'client' 
+    });
     await client.save();
     res.status(201).json({ message: 'Client registered successfully.' });
   } catch (err) {
@@ -290,7 +338,15 @@ app.post('/api/signup/candidate', async (req, res) => {
       return res.status(409).json({ message: 'Email already exists. Please use a different email.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const candidate = new Candidate({ firstName, lastName, email, phone, password: hashedPassword, role: 'candidate' });
+    // Ensure role is explicitly set to 'candidate'
+    const candidate = new Candidate({ 
+      firstName, 
+      lastName, 
+      email, 
+      phone, 
+      password: hashedPassword, 
+      role: 'candidate' 
+    });
     await candidate.save();
     res.status(201).json({ message: 'Candidate registered successfully.' });
   } catch (err) {
@@ -659,7 +715,17 @@ app.post('/api/clients', authenticate, async (req, res) => {
     const existing = await Client.findOne({ email });
     if (existing) return res.status(409).json({ message: 'Email already exists.' });
     const hashedPassword = await bcrypt.hash(password, 10);
-    const client = new Client({ firstName, lastName, email, phone, password: hashedPassword, role: 'client', company, redFlag });
+    // Ensure role is explicitly set to 'client' when admin creates client
+    const client = new Client({ 
+      firstName, 
+      lastName, 
+      email, 
+      phone, 
+      password: hashedPassword, 
+      role: 'client', 
+      company, 
+      redFlag 
+    });
     await client.save();
     res.status(201).json({ id: client._id, firstName: client.firstName, lastName: client.lastName, email: client.email, phone: client.phone, company: client.company, redFlag: client.redFlag });
   } catch (err) {
@@ -716,9 +782,10 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
   console.log('PUT /api/clients/profile - User:', req.user); // Debug log
   console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
   
+  // Check if user is a client
   if (req.user.role !== 'client') {
     console.log('Forbidden - User role:', req.user.role); // Debug log
-    return res.status(403).json({ message: 'Forbidden' });
+    return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
   }
   
   const { firstName, lastName, email, phone } = req.body;
@@ -728,12 +795,15 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
     const existingClient = await Client.findOne({ email, _id: { $ne: req.user.id } });
     if (existingClient) return res.status(409).json({ message: 'Email already exists.' });
     
+    // Update the client profile
     const client = await Client.findByIdAndUpdate(
       req.user.id, 
       { firstName, lastName, email, phone }, 
       { new: true }
     );
     if (!client) return res.status(404).json({ message: 'Client not found.' });
+    
+    console.log('Client profile updated successfully:', client);
     res.json({ 
       message: 'Profile updated successfully.',
       client: {
@@ -745,7 +815,7 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
       }
     });
   } catch (err) {
-    console.log('Error in profile update:', err.message); // Debug log
+    console.log('Error in client profile update:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -796,9 +866,10 @@ app.put('/api/candidates/profile', authenticate, async (req, res) => {
   console.log('PUT /api/candidates/profile - User:', req.user); // Debug log
   console.log('PUT /api/candidates/profile - Body:', req.body); // Debug log
   
+  // Check if user is a candidate
   if (req.user.role !== 'candidate') {
     console.log('Forbidden - User role:', req.user.role); // Debug log
-    return res.status(403).json({ message: 'Forbidden' });
+    return res.status(403).json({ message: 'Forbidden - Only candidates can update candidate profiles' });
   }
   
   const { firstName, lastName, email, phone } = req.body;
@@ -808,12 +879,15 @@ app.put('/api/candidates/profile', authenticate, async (req, res) => {
     const existingCandidate = await Candidate.findOne({ email, _id: { $ne: req.user.id } });
     if (existingCandidate) return res.status(409).json({ message: 'Email already exists.' });
     
+    // Update the candidate profile
     const candidate = await Candidate.findByIdAndUpdate(
       req.user.id, 
       { firstName, lastName, email, phone }, 
       { new: true }
     );
     if (!candidate) return res.status(404).json({ message: 'Candidate not found.' });
+    
+    console.log('Candidate profile updated successfully:', candidate);
     res.json({ 
       message: 'Profile updated successfully.',
       candidate: {
@@ -838,7 +912,15 @@ app.post('/api/candidates', authenticate, async (req, res) => {
     const existing = await Candidate.findOne({ email });
     if (existing) return res.status(409).json({ message: 'Email already exists.' });
     const hashedPassword = await bcrypt.hash(password, 10);
-    const candidate = new Candidate({ firstName, lastName, email, phone, password: hashedPassword, role: 'candidate' });
+    // Ensure role is explicitly set to 'candidate' when admin creates candidate
+    const candidate = new Candidate({ 
+      firstName, 
+      lastName, 
+      email, 
+      phone, 
+      password: hashedPassword, 
+      role: 'candidate' 
+    });
     await candidate.save();
     res.status(201).json({ id: candidate._id, firstName: candidate.firstName, lastName: candidate.lastName, email: candidate.email, phone: candidate.phone });
   } catch (err) {
