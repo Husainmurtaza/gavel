@@ -27,16 +27,23 @@ const corsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',')
   : [
       'http://localhost:5173',        // Local development
-      'http://localhost:3000',        // Alternative local port
-      'http://31.97.232.40:5000',    // Live server
+    
       'https://joingavel.com',        // Live frontend
       'https://www.joingavel.com'     // Live frontend www
     ];
 
-app.use(cors({
-  origin: corsOrigins,
-  credentials: true
-}));
+    app.use(cors({
+      origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        if (corsOrigins.includes(origin)) {
+          return callback(null, true);
+        } else {
+          return callback(new Error('Not allowed by CORS'));
+        }
+      },
+      credentials: true
+    }));  
 app.use(cookieParser());
 
 // MongoDB Connection with optimized settings
