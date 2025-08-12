@@ -82,147 +82,11 @@ app.post('/api/fix-user-roles', async (req, res) => {
   }
 });
 
-// Route to fix client roles specifically (for admin use)
-app.post('/api/fix-client-roles', async (req, res) => {
-  try {
-    // Fix all clients without roles
-    const clientsWithoutRole = await Client.updateMany(
-      { role: { $exists: false } },
-      { $set: { role: 'client' } }
-    );
-    
-    // Also fix clients with null/undefined roles
-    const clientsWithNullRole = await Client.updateMany(
-      { $or: [{ role: null }, { role: undefined }, { role: '' }] },
-      { $set: { role: 'client' } }
-    );
-    
-    res.json({ 
-      message: 'Client roles fixed successfully',
-      clientsFixed: clientsWithoutRole.modifiedCount + clientsWithNullRole.modifiedCount,
-      details: {
-        withoutRole: clientsWithoutRole.modifiedCount,
-        withNullRole: clientsWithNullRole.modifiedCount
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-});
-
-// Route to check user roles for debugging
-app.get('/api/debug/user-roles', async (req, res) => {
-  try {
-    const clients = await Client.find({}, { email: 1, role: 1, firstName: 1, lastName: 1 });
-    const candidates = await Candidate.find({}, { email: 1, role: 1, firstName: 1, lastName: 1 });
-    
-    res.json({
-      clients: clients.map(c => ({ email: c.email, role: c.role, name: `${c.firstName} ${c.lastName}` })),
-      candidates: candidates.map(c => ({ email: c.email, role: c.role, name: `${c.firstName} ${c.lastName}` }))
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-});
 
 
 
-// Test route to check authentication
-app.get('/api/test-auth', authenticate, (req, res) => {
-  res.json({ 
-    message: 'Authentication working', 
-    user: { id: req.user.id, role: req.user.role } 
-  });
-});
 
-// Test client profile route
-app.get('/api/test-client-profile', authenticate, async (req, res) => {
-  console.log('Test client profile - User:', req.user);
-  const client = await Client.findById(req.user.id);
-  if (client.role && client.role !== 'client') {
-    return res.status(403).json({ message: 'Forbidden' });
-  }
-  try {
-    const client = await Client.findById(req.user.id);
-    console.log('Client found in test:', client);
-    if (!client) {
-      return res.status(404).json({ message: 'Client not found in database' });
-    }
-    res.json({
-      message: 'Client found',
-      client: {
-        id: client._id,
-        firstName: client.firstName,
-        lastName: client.lastName,
-        email: client.email,
-        phone: client.phone
-      }
-    });
-  } catch (err) {
-    console.log('Error in test client profile:', err.message);
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-});
 
-// Test candidate profile route
-app.get('/api/test-candidate-profile', authenticate, async (req, res) => {
-  console.log('Test candidate profile - User:', req.user);
-  if (req.user.role !== 'candidate') {
-    return res.status(403).json({ message: 'Forbidden - Not a candidate' });
-  }
-  try {
-    const candidate = await Candidate.findById(req.user.id);
-    console.log('Candidate found in test:', candidate);
-    if (!candidate) {
-      return res.status(404).json({ message: 'Candidate not found in database' });
-    }
-    res.json({
-      message: 'Candidate found',
-      candidate: {
-        id: candidate._id,
-        firstName: candidate.firstName,
-        lastName: candidate.lastName,
-        email: candidate.email,
-        phone: candidate.phone
-      }
-    });
-  } catch (err) {
-    console.log('Error in test candidate profile:', err.message);
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-});
-
-// Test route to check all clients in database
-app.get('/api/test-all-clients', async (req, res) => {
-  try {
-    const clients = await Client.find({}).select('firstName lastName email phone role _id');
-    console.log('All clients in database:', clients);
-    res.json({
-      message: 'All clients',
-      count: clients.length,
-      clients: clients
-    });
-  } catch (err) {
-    console.log('Error getting all clients:', err.message);
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-});
-
-// Test route to check all candidates in database
-app.get('/api/test-all-candidates', async (req, res) => {
-  try {
-    const candidates = await Candidate.find({}).select('firstName lastName email phone role _id');
-    console.log('All candidates in database:', candidates);
-    res.json({
-      message: 'All candidates',
-      count: candidates.length,
-      candidates: candidates
-    });
-  } catch (err) {
-    console.log('Error getting all candidates:', err.message);
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-});
 
 // Route to refresh access token using refresh token
 app.post('/api/refresh-token', async (req, res) => {
@@ -287,13 +151,19 @@ function authenticate(req, res, next) {
 
 // Example protected route for client dashboard
 app.get('/api/protected/client', authenticate, async (req, res) => {
-  const client = await Client.findById(req.user.id);
-  if (client.role && client.role !== 'client') {
-    return res.status(403).json({ message: 'Forbidden' });
-  }
   try {
-    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
-    if (!client) return res.status(404).json({ message: 'Client not found' });
+    // Check user's role from database instead of JWT token
+    const client = await Client.findById(req.user.id);
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+    
+    // Check if user is a client or if role is missing (legacy users)
+    if (client.role && client.role !== 'client') {
+      console.log('Forbidden - User role from DB:', client.role);
+      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
+    }
+    
     const response = { 
       id: client._id, 
       firstName: client.firstName, 
@@ -303,6 +173,7 @@ app.get('/api/protected/client', authenticate, async (req, res) => {
     };
     res.json(response);
   } catch (err) {
+    console.error('Error in protected client route:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -789,13 +660,20 @@ app.delete('/api/clients/:id', authenticate, async (req, res) => {
 
 // Client profile GET route
 app.get('/api/clients/profile', authenticate, async (req, res) => {
-  const client = await Client.findById(req.user.id);
-if (client.role && client.role !== 'client') {
-  return res.status(403).json({ message: 'Forbidden' });
-}
   try {
-    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
-    if (!client) return res.status(404).json({ message: 'Client not found.' });
+    // Check user's role from database instead of JWT token
+    const client = await Client.findById(req.user.id);
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found.' });
+    }
+    
+    // Check if user is a client or if role is missing (legacy users)
+    if (client.role && client.role !== 'client') {
+      console.log('Forbidden - User role from DB:', client.role);
+      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
+    }
+    
+    // Return client profile data
     res.json({ 
       client: {
         id: client._id,
@@ -806,6 +684,7 @@ if (client.role && client.role !== 'client') {
       }
     });
   } catch (err) {
+    console.error('Error in client profile GET:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -840,26 +719,7 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
   }
 });
 
-// Route to check client role from database (for debugging)
-app.get('/api/clients/check-role', authenticate, async (req, res) => {
-  try {
-    const client = await Client.findById(req.user.id);
-    if (!client) {
-      return res.status(404).json({ message: 'Client not found' });
-    }
-    
-    res.json({
-      message: 'Client role check',
-      jwtRole: req.user.role,
-      dbRole: client.role,
-      clientId: req.user.id,
-      hasRole: !!client.role
-    });
-  } catch (err) {
-    console.error('Error checking client role:', err);
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-});
+
 
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
@@ -1176,20 +1036,31 @@ app.put('/api/admin/interviews/:id/reject', authenticate, async (req, res) => {
 
 // Get interviews for the logged-in client (positions they've posted)
 app.get('/api/client/interviews', authenticate, async (req, res) => {
-  if (req.user.role !== 'client') return res.status(403).json({ message: 'Forbidden' });
   try {
+    // Check user's role from database instead of JWT token
+    const client = await Client.findById(req.user.id);
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+    
+    // Check if user is a client or if role is missing (legacy users)
+    if (client.role && client.role !== 'client') {
+      console.log('Forbidden - User role from DB:', client.role);
+      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
+    }
+    
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
-    // First get the client's company
-    const client = await Client.findById(req.user.id).populate('company');
-    if (!client || !client.company) {
+    // Get client's company (populate after role check)
+    const clientWithCompany = await Client.findById(req.user.id).populate('company');
+    if (!clientWithCompany || !clientWithCompany.company) {
       return res.status(404).json({ message: 'Client company not found' });
     }
     
     // Get positions for this company
-    const positions = await Position.find({ company: client.company._id });
+    const positions = await Position.find({ company: clientWithCompany.company._id });
     const positionIds = positions.map(p => p._id.toString());
     
     // Get interviews for these positions
