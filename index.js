@@ -22,11 +22,18 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
 // Middleware
 app.use(express.json());
+// CORS configuration with environment support
+const corsOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',')
+  : [
+      'http://localhost:5173',        // Local development
+      'http://31.97.232.40:5000',    // Live server
+      'https://joingavel.com',
+      'https://www.joingavel.com'
+    ];
+
 app.use(cors({
-  origin: [
-    'http://31.97.232.40:5000',
-    'https://joingavel.com',
-    'https://www.joingavel.com'],
+  origin: corsOrigins,
   credentials: true
 }));
 app.use(cookieParser());
