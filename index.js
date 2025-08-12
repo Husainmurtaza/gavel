@@ -24,7 +24,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 app.use(express.json());
 app.use(cors({
   origin: [
-    'http://localhost:5173',
+    'http://31.97.232.40:5000',
     'https://joingavel.com',
     'https://www.joingavel.com'],
   credentials: true
