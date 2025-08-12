@@ -212,8 +212,15 @@ app.post('/api/refresh-token', authenticate, async (req, res) => {
 
 // Auth middleware
 function authenticate(req, res, next) {
+  console.log('Auth middleware - Cookies:', req.cookies);
+  console.log('Auth middleware - Headers:', req.headers);
+  
   const token = req.cookies.token;
-  if (!token) return res.status(401).json({ message: 'Session expired. Please login again.' });
+  if (!token) {
+    console.log('No token found in cookies');
+    return res.status(401).json({ message: 'Session expired. Please login again.' });
+  }
+  
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
@@ -332,11 +339,16 @@ app.post('/api/login/client', async (req, res) => {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
   const clientToken = jwt.sign({ id: client._id, role: 'client' }, JWT_SECRET, { expiresIn: '4h' });
+  
+  // Cookie settings that work for both local and production
+  const isProduction = process.env.NODE_ENV === 'production';
+  console.log('Setting client cookie - Production:', isProduction, 'Secure:', isProduction, 'SameSite:', isProduction ? 'none' : 'lax');
+  
   res.cookie('token', clientToken, { 
     httpOnly: true, 
     maxAge: 14400000, // 4 hours in milliseconds
-    secure: true,
-    sameSite: 'none'
+    secure: isProduction, // Only use secure in production
+    sameSite: isProduction ? 'none' : 'lax' // Use 'none' only in production
   });
   res.json({ message: 'Login successful', redirect: '/dashboard' });
 });
@@ -356,11 +368,16 @@ app.post('/api/login/candidate', async (req, res) => {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
   const candidateToken = jwt.sign({ id: candidate._id, role: 'candidate' }, JWT_SECRET, { expiresIn: '4h' });
+  
+  // Cookie settings that work for both local and production
+  const isProduction = process.env.NODE_ENV === 'production';
+  console.log('Setting candidate cookie - Production:', isProduction, 'Secure:', isProduction, 'SameSite:', isProduction ? 'none' : 'lax');
+  
   res.cookie('token', candidateToken, { 
     httpOnly: true, 
     maxAge: 14400000, // 4 hours in milliseconds
-    secure: true,
-    sameSite: 'none'
+    secure: isProduction, // Only use secure in production
+    sameSite: isProduction ? 'none' : 'lax' // Use 'none' only in production
   });
   res.json({ message: 'Login successful', redirect: '/candidate' });
 });
@@ -415,11 +432,16 @@ app.post('/api/login/admin', async (req, res) => {
     }
     
     const adminToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '4h' });
+    
+    // Cookie settings that work for both local and production
+    const isProduction = process.env.NODE_ENV === 'production';
+    console.log('Setting admin cookie - Production:', isProduction, 'Secure:', isProduction, 'SameSite:', isProduction ? 'none' : 'lax');
+    
     res.cookie('token', adminToken, { 
       httpOnly: true, 
       maxAge: 14400000, // 4 hours in milliseconds
-      secure: true,
-      sameSite: 'none'
+      secure: isProduction, // Only use secure in production
+      sameSite: isProduction ? 'none' : 'lax' // Use 'none' only in production
     });
     res.json({ message: 'Admin login successful', redirect: '/admin' });
     return;
@@ -435,11 +457,16 @@ app.post('/api/login/admin', async (req, res) => {
     return res.status(401).json({ message: 'Invalid email or password.' });
   }
   const adminToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '4h' });
+  
+  // Cookie settings that work for both local and production
+  const isProduction = process.env.NODE_ENV === 'production';
+  console.log('Setting admin cookie - Production:', isProduction, 'Secure:', isProduction, 'SameSite:', isProduction ? 'none' : 'lax');
+  
   res.cookie('token', adminToken, { 
     httpOnly: true, 
     maxAge: 14400000, // 4 hours in milliseconds
-    secure: true,
-    sameSite: 'none'
+    secure: isProduction, // Only use secure in production
+    sameSite: isProduction ? 'none' : 'lax' // Use 'none' only in production
   });
   res.json({ message: 'Admin login successful', redirect: '/admin' });
 });
@@ -447,10 +474,11 @@ app.post('/api/login/admin', async (req, res) => {
 // Logout route (destroy session)
 app.post('/api/logout', (req, res) => {
   console.log('Logging out user'); // Debug log
+  const isProduction = process.env.NODE_ENV === 'production';
   res.clearCookie('token', { 
     httpOnly: true, 
-    secure: true,
-    sameSite: 'none'
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax'
   });
   res.json({ message: 'Logged out successfully' });
 });
