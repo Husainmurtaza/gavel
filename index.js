@@ -29,7 +29,8 @@ const corsOrigins = process.env.CORS_ORIGINS
       'http://localhost:5173',        // Local development
     
       'https://joingavel.com',        // Live frontend
-      'https://www.joingavel.com'     // Live frontend www
+      'https://www.joingavel.com',    // Live frontend www
+      'https://gavelbackend.duckdns.org'  // Live backend
     ];
 
     app.use(cors({
@@ -282,7 +283,7 @@ app.post('/api/login/client', async (req, res) => {
   const refreshToken = jwt.sign({ id: client._id, role: 'client' }, JWT_SECRET, { expiresIn: '7d' });
   
   // Set refresh token as HTTP-only cookie
-  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
+  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org'));
   res.cookie('refreshToken', refreshToken, { 
     httpOnly: true, 
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -320,7 +321,7 @@ app.post('/api/login/candidate', async (req, res) => {
   const refreshToken = jwt.sign({ id: candidate._id, role: 'candidate' }, JWT_SECRET, { expiresIn: '7d' });
   
   // Set refresh token as HTTP-only cookie
-  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
+  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org'));
   res.cookie('refreshToken', refreshToken, { 
     httpOnly: true, 
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -392,7 +393,7 @@ app.post('/api/login/admin', async (req, res) => {
     const refreshToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
     
     // Set refresh token as HTTP-only cookie
-    const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
+    const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org'));
     res.cookie('refreshToken', refreshToken, { 
       httpOnly: true, 
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -425,7 +426,7 @@ app.post('/api/login/admin', async (req, res) => {
   const refreshToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
   
   // Set refresh token as HTTP-only cookie
-  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
+  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org'));
   res.cookie('refreshToken', refreshToken, { 
     httpOnly: true, 
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -445,7 +446,7 @@ app.post('/api/login/admin', async (req, res) => {
 
 // Logout route (destroy session)
 app.post('/api/logout', (req, res) => {
-  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('31.97.232.40'));
+  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org'));
   res.clearCookie('refreshToken', { 
     httpOnly: true, 
     secure: isProduction,
