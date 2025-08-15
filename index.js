@@ -644,18 +644,47 @@ app.post('/api/clients', authenticate, async (req, res) => {
 });
 
 app.put('/api/clients/:id', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
-  const { firstName, lastName, email, phone, company, redFlag } = req.body;
-  if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+
+  const { firstName, lastName, email, phone, company, redFlag, password } = req.body;
+  if (!firstName || !lastName || !email || !phone) {
+    return res.status(400).json({ message: 'All fields are required.' });
+  }
+
   try {
-    const client = await Client.findByIdAndUpdate(req.params.id, { firstName, lastName, email, phone, company, redFlag }, { new: true });
-    if (!client) return res.status(404).json({ message: 'Client not found.' });
-    res.json({ id: client._id, firstName: client.firstName, lastName: client.lastName, email: client.email, phone: client.phone, company: client.company, redFlag: client.redFlag });
+    const updateData = { firstName, lastName, email, phone, company, redFlag };
+
+    // If a new password was provided, hash it
+    if (password && password.trim() !== '') {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(password, salt);
+    }
+
+    const client = await Client.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    );
+
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found.' });
+    }
+
+    res.json({
+      id: client._id,
+      firstName: client.firstName,
+      lastName: client.lastName,
+      email: client.email,
+      phone: client.phone,
+      company: client.company,
+      redFlag: client.redFlag
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
-
 app.delete('/api/clients/:id', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
   try {
