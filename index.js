@@ -601,13 +601,14 @@ app.get('/api/clients', authenticate, async (req, res) => {
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
-    const clients = await Client.find({}, { firstName: 1, lastName: 1, email: 1, phone: 1, company: 1, redFlag: 1 }).populate('company', 'name');
+    const clients = await Client.find({}, { firstName: 1, lastName: 1, email: 1, phone: 1, password: 1, company: 1, redFlag: 1 }).populate('company', 'name');
     res.json(clients.map(c => ({
       id: c._id,
       firstName: c.firstName,
       lastName: c.lastName,
       email: c.email,
       phone: c.phone,
+      password: c.password,
       company: c.company ? { id: c.company._id, name: c.company.name } : null,
       redFlag: c.redFlag || ''
     })));
