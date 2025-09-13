@@ -1,5 +1,5 @@
 // API Configuration - Always use live backend with HTTPS
-const API_BASE_URL = 'https://gavelbackend.duckdns.org';
+const API_BASE_URL = 'https://evolvegov.com';
 
 
 

@@ -4,7 +4,7 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import { authenticatedFetch } from '../../utils/api';
-import { API_ENDPOINTS } from '../../config/api';
+import { API_ENDPOINTS, API_BASE_URL } from '../../config/api';
 
 const initialProfile = {
   firstName: '',
@@ -22,20 +22,57 @@ const Profile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        // Get user data from localStorage
-        const userData = JSON.parse(localStorage.getItem('user'));
-        if (userData) {
+        // First try to get data from API
+        const response = await authenticatedFetch(API_ENDPOINTS.ADMIN_PROFILE.replace(API_BASE_URL, ''));
+        
+        if (response.ok) {
+          const data = await response.json();
           setProfile({
-            firstName: userData.firstName || '',
-            lastName: userData.lastName || '',
-            email: userData.email || '',
+            firstName: data.admin.firstName || '',
+            lastName: data.admin.lastName || '',
+            email: data.admin.email || '',
             avatar: ''
           });
+          
+          // Update localStorage with latest data from server
+          const userData = JSON.parse(localStorage.getItem('user')) || {};
+          const updatedUserData = {
+            ...userData,
+            firstName: data.admin.firstName,
+            lastName: data.admin.lastName,
+            email: data.admin.email
+          };
+          localStorage.setItem('user', JSON.stringify(updatedUserData));
+        } else {
+          // Fallback to localStorage if API fails
+          const userData = JSON.parse(localStorage.getItem('user'));
+          if (userData) {
+            setProfile({
+              firstName: userData.firstName || '',
+              lastName: userData.lastName || '',
+              email: userData.email || '',
+              avatar: ''
+            });
+          }
         }
         setLoading(false);
       } catch (err) {
-        setError('Failed to load profile');
-        setLoading(false);
+        // Fallback to localStorage if API fails
+        try {
+          const userData = JSON.parse(localStorage.getItem('user'));
+          if (userData) {
+            setProfile({
+              firstName: userData.firstName || '',
+              lastName: userData.lastName || '',
+              email: userData.email || '',
+              avatar: ''
+            });
+          }
+          setLoading(false);
+        } catch (localErr) {
+          setError('Failed to load profile');
+          setLoading(false);
+        }
       }
     };
     
