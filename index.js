@@ -343,16 +343,16 @@ app.post('/api/login/candidate', async (req, res) => {
 // Create admin route (for initial setup)
 app.post('/api/create-admin', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required.' });
+    const { email, password, name } = req.body;
+    if (!email || !password || !name) {
+      return res.status(400).json({ message: 'Name, email and password are required.' });
     }
     const existing = await Admin.findOne({ email });
     if (existing) {
       return res.status(409).json({ message: 'Admin already exists.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const admin = new Admin({ email, password: hashedPassword, role: 'admin' });
+    const admin = new Admin({ name, email, password: hashedPassword, role: 'admin' });
     await admin.save();
     res.status(201).json({ message: 'Admin created successfully.' });
   } catch (err) {
@@ -374,10 +374,8 @@ app.post('/api/login/admin', async (req, res) => {
     if (!admin) {
       const hashedPassword = await bcrypt.hash(password, 10);
       admin = new Admin({ 
-        firstName: 'Admin', 
-        lastName: 'User', 
+        name: 'Admin',
         email, 
-        phone: '0000000000', 
         password: hashedPassword, 
         role: 'admin' 
       });
@@ -394,7 +392,7 @@ app.post('/api/login/admin', async (req, res) => {
     const refreshToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
     
     // Set refresh token as HTTP-only cookie
-    const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org'));
+    const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org') || req.headers.origin.includes('evolvegov.com'));
     res.cookie('refreshToken', refreshToken, { 
       httpOnly: true, 
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -408,7 +406,7 @@ app.post('/api/login/admin', async (req, res) => {
       message: 'Admin login successful', 
       redirect: '/admin',
       accessToken,
-      user: { id: admin._id, role: 'admin', firstName: admin.firstName, lastName: admin.lastName }
+      user: { id: admin._id, role: 'admin', name: admin.name, email: admin.email }
     });
     return;
   }
@@ -427,7 +425,7 @@ app.post('/api/login/admin', async (req, res) => {
   const refreshToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
   
   // Set refresh token as HTTP-only cookie
-  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org'));
+  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org') || req.headers.origin.includes('evolvegov.com'));
   res.cookie('refreshToken', refreshToken, { 
     httpOnly: true, 
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -441,7 +439,7 @@ app.post('/api/login/admin', async (req, res) => {
     message: 'Admin login successful', 
     redirect: '/admin',
     accessToken,
-    user: { id: admin._id, role: 'admin', firstName: admin.firstName, lastName: admin.lastName }
+    user: { id: admin._id, role: 'admin', name: admin.name, email: admin.email }
   });
 });
 
@@ -1089,14 +1087,12 @@ app.get('/api/admin/profile', authenticate, async (req, res) => {
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
-    const admin = await Admin.findById(req.user.id).select('firstName lastName email phone _id');
+    const admin = await Admin.findById(req.user.id).select('name email _id');
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
     res.json({
       id: admin._id,
-      firstName: admin.firstName || '',
-      lastName: admin.lastName || '',
-      email: admin.email || '',
-      phone: admin.phone || ''
+      name: admin.name || '',
+      email: admin.email || ''
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -1108,9 +1104,9 @@ app.put('/api/admin/profile', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Forbidden' });
   }
-  const { firstName, lastName, email, phone } = req.body;
-  if (!firstName || !lastName || !email || !phone) {
-    return res.status(400).json({ message: 'All fields are required.' });
+  const { name, email } = req.body;
+  if (!name || !email) {
+    return res.status(400).json({ message: 'Name and email are required.' });
   }
   try {
     // Ensure unique email among admins
@@ -1119,17 +1115,15 @@ app.put('/api/admin/profile', authenticate, async (req, res) => {
 
     const admin = await Admin.findByIdAndUpdate(
       req.user.id,
-      { firstName, lastName, email, phone },
+      { name, email },
       { new: true }
     );
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
     res.json({
       message: 'Profile updated successfully.',
       id: admin._id,
-      firstName: admin.firstName,
-      lastName: admin.lastName,
-      email: admin.email,
-      phone: admin.phone
+      name: admin.name,
+      email: admin.email
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
