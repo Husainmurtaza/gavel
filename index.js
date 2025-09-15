@@ -1104,7 +1104,7 @@ app.put('/api/admin/profile', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Forbidden' });
   }
-  const { name, email } = req.body;
+  const { name, email, password } = req.body;
   if (!name || !email) {
     return res.status(400).json({ message: 'Name and email are required.' });
   }
@@ -1113,9 +1113,15 @@ app.put('/api/admin/profile', authenticate, async (req, res) => {
     const existingAdmin = await Admin.findOne({ email, _id: { $ne: req.user.id } });
     if (existingAdmin) return res.status(409).json({ message: 'Email already exists.' });
 
+    const updateData = { name, email };
+    if (password && password.trim() !== '') {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(password, salt);
+    }
+
     const admin = await Admin.findByIdAndUpdate(
       req.user.id,
-      { name, email },
+      updateData,
       { new: true }
     );
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
