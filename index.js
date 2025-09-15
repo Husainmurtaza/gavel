@@ -343,7 +343,7 @@ app.post('/api/login/candidate', async (req, res) => {
 // Create admin route (for initial setup)
 app.post('/api/create-admin', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, name } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
@@ -352,7 +352,7 @@ app.post('/api/create-admin', async (req, res) => {
       return res.status(409).json({ message: 'Admin already exists.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const admin = new Admin({ email, password: hashedPassword, role: 'admin' });
+    const admin = new Admin({ email, password: hashedPassword, name: name || 'Admin' });
     await admin.save();
     res.status(201).json({ message: 'Admin created successfully.' });
   } catch (err) {
@@ -374,12 +374,9 @@ app.post('/api/login/admin', async (req, res) => {
     if (!admin) {
       const hashedPassword = await bcrypt.hash(password, 10);
       admin = new Admin({ 
-        firstName: 'Admin', 
-        lastName: 'User', 
+        name: 'Admin', 
         email, 
-        phone: '0000000000', 
-        password: hashedPassword, 
-        role: 'admin' 
+        password: hashedPassword
       });
       await admin.save();
     }
@@ -408,7 +405,7 @@ app.post('/api/login/admin', async (req, res) => {
       message: 'Admin login successful', 
       redirect: '/admin',
       accessToken,
-      user: { id: admin._id, role: 'admin', firstName: admin.firstName, lastName: admin.lastName }
+      user: { id: admin._id, role: 'admin', name: admin.name }
     });
     return;
   }
@@ -441,7 +438,7 @@ app.post('/api/login/admin', async (req, res) => {
     message: 'Admin login successful', 
     redirect: '/admin',
     accessToken,
-    user: { id: admin._id, role: 'admin', firstName: admin.firstName, lastName: admin.lastName }
+    user: { id: admin._id, role: 'admin', name: admin.name }
   });
 });
 
@@ -462,9 +459,47 @@ app.get('/api/protected/admin', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
   // Optionally fetch admin info from DB
   try {
-    const admin = await Admin.findById(req.user.id).select('email _id');
+    const admin = await Admin.findById(req.user.id).select('email name _id');
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
-    res.json({ id: admin._id, email: admin.email });
+    res.json({ id: admin._id, email: admin.email, name: admin.name });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Admin profile GET route
+app.get('/api/admin/profile', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  try {
+    const admin = await Admin.findById(req.user.id).select('name email _id');
+    if (!admin) return res.status(404).json({ message: 'Admin not found.' });
+    res.json({ id: admin._id, name: admin.name, email: admin.email });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Admin profile update route
+app.put('/api/admin/profile', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email) return res.status(400).json({ message: 'Name and email are required.' });
+
+    // Ensure email uniqueness among admins
+    const existing = await Admin.findOne({ email, _id: { $ne: req.user.id } });
+    if (existing) return res.status(409).json({ message: 'Email already exists.' });
+
+    const update = { name, email };
+    if (password && password.trim() !== '') {
+      const salt = await bcrypt.genSalt(10);
+      update.password = await bcrypt.hash(password, salt);
+    }
+
+    const admin = await Admin.findByIdAndUpdate(req.user.id, update, { new: true });
+    if (!admin) return res.status(404).json({ message: 'Admin not found.' });
+
+    res.json({ message: 'Profile updated successfully.', admin: { id: admin._id, name: admin.name, email: admin.email } });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
