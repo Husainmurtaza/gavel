@@ -23,29 +23,33 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 // Middleware
 app.use(express.json());
 // CORS configuration with environment support
-const corsOrigins = process.env.CORS_ORIGINS 
+const rawCorsOrigins = process.env.CORS_ORIGINS 
   ? process.env.CORS_ORIGINS.split(',')
   : [
-      'http://localhost:5173',        // Local development
-    
-      'https://joingavel.com',        // Live frontend
-      'https://www.joingavel.com',    // Live frontend www
-      'https://evolvegov.com/',  // Live backend
-      'https://www.evolvegov.com/'  // Live backend
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'https://joingavel.com',
+      'https://www.joingavel.com',
+      'https://evolvegov.com',
+      'https://www.evolvegov.com'
     ];
+// Normalize origins (remove trailing slashes)
+const corsOrigins = rawCorsOrigins.map(o => o.replace(/\/+$/, ''));
 
-    app.use(cors({
-      origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl)
-        if (!origin) return callback(null, true);
-        if (corsOrigins.includes(origin)) {
-          return callback(null, true);
-        } else {
-          return callback(new Error('Not allowed by CORS'));
-        }
-      },
-      credentials: true
-    }));  
+const corsMiddleware = cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const normalized = origin.replace(/\/+$/, '');
+    if (corsOrigins.includes(normalized)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+});
+app.use(corsMiddleware);
+// Handle preflight
+app.options('*', corsMiddleware);
 app.use(cookieParser());
 
 // MongoDB Connection with optimized settings
@@ -1134,6 +1138,11 @@ app.put('/api/admin/profile', authenticate, async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
+});
+
+// Health checks
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
 });
 
 app.listen(PORT, () => {
