@@ -15,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Add response compression
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '11mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://GavelDatabase:j5NmOUB8hi1LfBxI@gavelcluster.p7kueq8.mongodb.net/gavel?retryWrites=true&w=majority&appName=GavelCluster';
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
@@ -23,33 +23,29 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 // Middleware
 app.use(express.json());
 // CORS configuration with environment support
-const rawCorsOrigins = process.env.CORS_ORIGINS 
+const corsOrigins = process.env.CORS_ORIGINS 
   ? process.env.CORS_ORIGINS.split(',')
   : [
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'https://joingavel.com',
-      'https://www.joingavel.com',
-      'https://evolvegov.com',
-      'https://www.evolvegov.com'
+      'http://localhost:5173',        // Local development
+    
+      'https://joingavel.com',        // Live frontend
+      'https://www.joingavel.com',    // Live frontend www
+      'https://evolvegov.com/',  // Live backend
+      'https://www.evolvegov.com/'  // Live backend
     ];
-// Normalize origins (remove trailing slashes)
-const corsOrigins = rawCorsOrigins.map(o => o.replace(/\/+$/, ''));
 
-const corsMiddleware = cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    const normalized = origin.replace(/\/+$/, '');
-    if (corsOrigins.includes(normalized)) {
-      return callback(null, true);
-    }
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true
-});
-app.use(corsMiddleware);
-// Handle preflight
-app.options('*', corsMiddleware);
+    app.use(cors({
+      origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        if (corsOrigins.includes(origin)) {
+          return callback(null, true);
+        } else {
+          return callback(new Error('Not allowed by CORS'));
+        }
+      },
+      credentials: true
+    }));  
 app.use(cookieParser());
 
 // MongoDB Connection with optimized settings
@@ -347,16 +343,16 @@ app.post('/api/login/candidate', async (req, res) => {
 // Create admin route (for initial setup)
 app.post('/api/create-admin', async (req, res) => {
   try {
-    const { email, password, name } = req.body;
-    if (!email || !password || !name) {
-      return res.status(400).json({ message: 'Name, email and password are required.' });
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
     }
     const existing = await Admin.findOne({ email });
     if (existing) {
       return res.status(409).json({ message: 'Admin already exists.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const admin = new Admin({ name, email, password: hashedPassword, role: 'admin' });
+    const admin = new Admin({ email, password: hashedPassword, role: 'admin' });
     await admin.save();
     res.status(201).json({ message: 'Admin created successfully.' });
   } catch (err) {
@@ -378,8 +374,10 @@ app.post('/api/login/admin', async (req, res) => {
     if (!admin) {
       const hashedPassword = await bcrypt.hash(password, 10);
       admin = new Admin({ 
-        name: 'Admin',
+        firstName: 'Admin', 
+        lastName: 'User', 
         email, 
+        phone: '0000000000', 
         password: hashedPassword, 
         role: 'admin' 
       });
@@ -396,7 +394,7 @@ app.post('/api/login/admin', async (req, res) => {
     const refreshToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
     
     // Set refresh token as HTTP-only cookie
-    const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org') || req.headers.origin.includes('evolvegov.com'));
+    const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org'));
     res.cookie('refreshToken', refreshToken, { 
       httpOnly: true, 
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -410,7 +408,7 @@ app.post('/api/login/admin', async (req, res) => {
       message: 'Admin login successful', 
       redirect: '/admin',
       accessToken,
-      user: { id: admin._id, role: 'admin', name: admin.name, email: admin.email }
+      user: { id: admin._id, role: 'admin', firstName: admin.firstName, lastName: admin.lastName }
     });
     return;
   }
@@ -429,7 +427,7 @@ app.post('/api/login/admin', async (req, res) => {
   const refreshToken = jwt.sign({ id: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
   
   // Set refresh token as HTTP-only cookie
-  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org') || req.headers.origin.includes('evolvegov.com'));
+  const isProduction = req.headers.origin && (req.headers.origin.includes('joingavel.com') || req.headers.origin.includes('gavelbackend.duckdns.org'));
   res.cookie('refreshToken', refreshToken, { 
     httpOnly: true, 
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -443,7 +441,7 @@ app.post('/api/login/admin', async (req, res) => {
     message: 'Admin login successful', 
     redirect: '/admin',
     accessToken,
-    user: { id: admin._id, role: 'admin', name: admin.name, email: admin.email }
+    user: { id: admin._id, role: 'admin', firstName: admin.firstName, lastName: admin.lastName }
   });
 });
 
@@ -1083,66 +1081,6 @@ app.get('/api/client/interviews', authenticate, async (req, res) => {
     console.error('Error fetching client interviews:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
-});
-
-// Admin profile GET route
-app.get('/api/admin/profile', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Forbidden' });
-  }
-  try {
-    const admin = await Admin.findById(req.user.id).select('name email _id');
-    if (!admin) return res.status(404).json({ message: 'Admin not found' });
-    res.json({
-      id: admin._id,
-      name: admin.name || '',
-      email: admin.email || ''
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-});
-
-// Admin profile UPDATE route
-app.put('/api/admin/profile', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Forbidden' });
-  }
-  const { name, email, password } = req.body;
-  if (!name || !email) {
-    return res.status(400).json({ message: 'Name and email are required.' });
-  }
-  try {
-    // Ensure unique email among admins
-    const existingAdmin = await Admin.findOne({ email, _id: { $ne: req.user.id } });
-    if (existingAdmin) return res.status(409).json({ message: 'Email already exists.' });
-
-    const updateData = { name, email };
-    if (password && password.trim() !== '') {
-      const salt = await bcrypt.genSalt(10);
-      updateData.password = await bcrypt.hash(password, salt);
-    }
-
-    const admin = await Admin.findByIdAndUpdate(
-      req.user.id,
-      updateData,
-      { new: true }
-    );
-    if (!admin) return res.status(404).json({ message: 'Admin not found' });
-    res.json({
-      message: 'Profile updated successfully.',
-      id: admin._id,
-      name: admin.name,
-      email: admin.email
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
-});
-
-// Health checks
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
 });
 
 app.listen(PORT, () => {
