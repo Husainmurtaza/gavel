@@ -795,14 +795,10 @@ app.delete('/api/clients/:id', authenticate, async (req, res) => {
 // Client profile GET route
 app.get('/api/clients/profile', authenticate, async (req, res) => {
   console.log('GET /api/clients/profile - User:', req.user); // Debug log
-  if (req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
-    return res.status(403).json({ message: 'Forbidden' });
-  }
   try {
-    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
+    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id role');
     console.log('Client found:', client); // Debug log
-    if (!client) return res.status(404).json({ message: 'Client not found.' });
+    if (!client) return res.status(403).json({ message: 'Forbidden - Not a client' });
     const response = { 
       client: {
         id: client._id,
@@ -850,15 +846,15 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
   console.log('PUT /api/clients/profile - User:', req.user); // Debug log
   console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
   
-  // Check if user is a client
-  if (req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
-    return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
-  }
-  
   const { firstName, lastName, email, phone } = req.body;
   if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
   try {
+    // Ensure the requester is a client by DB check
+    const currentClient = await Client.findById(req.user.id).select('_id');
+    if (!currentClient) {
+      return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
+    }
+
     // Check if email is already taken by another client
     const existingClient = await Client.findOne({ email, _id: { $ne: req.user.id } });
     if (existingClient) return res.status(409).json({ message: 'Email already exists.' });
