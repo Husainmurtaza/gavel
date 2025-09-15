@@ -1083,6 +1083,59 @@ app.get('/api/client/interviews', authenticate, async (req, res) => {
   }
 });
 
+// Admin profile GET route
+app.get('/api/admin/profile', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  try {
+    const admin = await Admin.findById(req.user.id).select('firstName lastName email phone _id');
+    if (!admin) return res.status(404).json({ message: 'Admin not found' });
+    res.json({
+      id: admin._id,
+      firstName: admin.firstName || '',
+      lastName: admin.lastName || '',
+      email: admin.email || '',
+      phone: admin.phone || ''
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Admin profile UPDATE route
+app.put('/api/admin/profile', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  const { firstName, lastName, email, phone } = req.body;
+  if (!firstName || !lastName || !email || !phone) {
+    return res.status(400).json({ message: 'All fields are required.' });
+  }
+  try {
+    // Ensure unique email among admins
+    const existingAdmin = await Admin.findOne({ email, _id: { $ne: req.user.id } });
+    if (existingAdmin) return res.status(409).json({ message: 'Email already exists.' });
+
+    const admin = await Admin.findByIdAndUpdate(
+      req.user.id,
+      { firstName, lastName, email, phone },
+      { new: true }
+    );
+    if (!admin) return res.status(404).json({ message: 'Admin not found' });
+    res.json({
+      message: 'Profile updated successfully.',
+      id: admin._id,
+      firstName: admin.firstName,
+      lastName: admin.lastName,
+      email: admin.email,
+      phone: admin.phone
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 }); 
