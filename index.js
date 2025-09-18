@@ -1,33 +1,42 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const Client = require('./models/client');
-const Candidate = require('./models/candidate');
-import { Resend } from "resend";
-import bodyParser from "body-parser";
-const bcrypt = require('bcryptjs');
-const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
-const Admin = require('./models/admin');
-const Position = require('./models/position');
-const Interview = require('./models/interview');
-const Company = require('./models/company');
-import dotenv from "dotenv";
-
-dotenv.config();
+const express = require("express");
+const mongoose = require("mongoose");
+const Client = require("./models/client");
+const Candidate = require("./models/candidate");
+const { Resend } = require("resend");   // <-- FIXED (CommonJS)
+const bodyParser = require("body-parser"); // <-- FIXED (require instead of import)
+const bcrypt = require("bcryptjs");
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
+const Admin = require("./models/admin");
+const Position = require("./models/position");
+const Interview = require("./models/interview");
+const Company = require("./models/company");
+require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Add response compression
-app.use(express.json({ limit: '11mb' }));
+// Middlewares
+app.use(express.json({ limit: "11mb" }));
 app.use(bodyParser.json());
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://GavelDatabase:j5NmOUB8hi1LfBxI@gavelcluster.p7kueq8.mongodb.net/gavel?retryWrites=true&w=majority&appName=GavelCluster';
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(cors());
+app.use(cookieParser());
 
+// MongoDB connection
+const MONGO_URI =
+  process.env.MONGO_URI ||
+  "mongodb+srv://GavelDatabase:j5NmOUB8hi1LfBxI@gavelcluster.p7kueq8.mongodb.net/gavel?retryWrites=true&w=majority&appName=GavelCluster";
 
+mongoose
+  .connect(MONGO_URI)
+  .then(() => console.log("MongoDB connection successful"))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
+const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
+
+// Resend email setup
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 app.post("/send-email", async (req, res) => {
@@ -35,8 +44,8 @@ app.post("/send-email", async (req, res) => {
 
   try {
     const data = await resend.emails.send({
-      from: "onboarding@resend.dev", // must be verified or use a custom domain
-      to: "your@email.com",          // replace with your receiving email
+      from: "onboarding@resend.dev", // must be verified
+      to: "your@email.com",          // replace with your email
       subject: "New Contact Form Submission",
       html: `
         <p><b>Name:</b> ${name}</p>
