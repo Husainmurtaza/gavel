@@ -12,6 +12,9 @@ const Admin = require('./models/admin');
 const Position = require('./models/position');
 const Interview = require('./models/interview');
 const Company = require('./models/company');
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
