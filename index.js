@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Client = require('./models/client');
 const Candidate = require('./models/candidate');
+import { Resend } from "resend";
+import bodyParser from "body-parser";
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -16,10 +18,37 @@ const PORT = process.env.PORT || 5000;
 
 // Add response compression
 app.use(express.json({ limit: '11mb' }));
+app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://GavelDatabase:j5NmOUB8hi1LfBxI@gavelcluster.p7kueq8.mongodb.net/gavel?retryWrites=true&w=majority&appName=GavelCluster';
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
+
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+app.post("/send-email", async (req, res) => {
+  const { name, email, phone, details } = req.body;
+
+  try {
+    const data = await resend.emails.send({
+      from: "onboarding@resend.dev", // must be verified or use a custom domain
+      to: "your@email.com",          // replace with your receiving email
+      subject: "New Contact Form Submission",
+      html: `
+        <p><b>Name:</b> ${name}</p>
+        <p><b>Email:</b> ${email}</p>
+        <p><b>Phone:</b> ${phone}</p>
+        <p><b>Message:</b> ${details}</p>
+      `,
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error("Email send error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 // Middleware
 app.use(express.json());
 // CORS configuration with environment support
