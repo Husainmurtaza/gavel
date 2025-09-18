@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const Client = require("./models/client");
@@ -12,7 +14,7 @@ const Admin = require("./models/admin");
 const Position = require("./models/position");
 const Interview = require("./models/interview");
 const Company = require("./models/company");
-require("dotenv").config();
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -61,6 +63,8 @@ app.post("/send-email", async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+
 // Middleware
 app.use(express.json());
 // CORS configuration with environment support
