@@ -900,8 +900,15 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
 app.put('/api/clients/profile', authenticate, async (req, res) => {
    console.log('PUT /api/clients/profile - User:', req.user); // DEBUG: show JWT payload
   console.log('PUT /api/clients/profile - Body:', req.body); // DEBUG: show submitted data
-  if (req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role);
+
+  // Check user's role from database instead of JWT token
+  const clientCheck = await Client.findById(req.user.id);
+  if (!clientCheck) {
+    return res.status(404).json({ message: 'Client not found' });
+  }
+  // Check if user is a client or if role is missing (legacy users)
+  if (clientCheck.role && clientCheck.role !== 'client') {
+    console.log('Forbidden - User role from DB:', clientCheck.role);
     return res.status(403).json({ message: 'Forbidden - Only clients can update profiles' });
   }
 
