@@ -898,7 +898,10 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
 
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
+   console.log('PUT /api/clients/profile - User:', req.user); // DEBUG: show JWT payload
+  console.log('PUT /api/clients/profile - Body:', req.body); // DEBUG: show submitted data
   if (req.user.role !== 'client') {
+    console.log('Forbidden - User role:', req.user.role);
     return res.status(403).json({ message: 'Forbidden - Only clients can update profiles' });
   }
 
