@@ -903,55 +903,43 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
 
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
-   console.log('PUT /api/clients/profile - User:', req.user); // DEBUG: show JWT payload
-  console.log('PUT /api/clients/profile - Body:', req.body); // DEBUG: show submitted data
-
-  // Check if user is a client (same logic as candidate route)
+  console.log('PUT /api/clients/profile - User:', req.user); // Debug log
+  console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
+  
+  // Check if user is a client
   if (req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role);
-    return res.status(403).json({ message: 'Forbidden - Only clients can update profiles' });
+    console.log('Forbidden - User role:', req.user.role); // Debug log
+    return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
   }
   
-  // Verify client exists in database
-  const clientCheck = await Client.findById(req.user.id);
-  if (!clientCheck) {
-    return res.status(404).json({ message: 'Client not found' });
-  }
-  
-  // If role is missing in database, set it to 'client' for legacy users
-  if (!clientCheck.role) {
-    console.log('Setting missing role to client for user:', req.user.id);
-    await Client.findByIdAndUpdate(req.user.id, { role: 'client' });
-  }
-
   const { firstName, lastName, email, phone } = req.body;
-  if (!firstName || !lastName || !email || !phone) {
-    return res.status(400).json({ message: 'All fields are required.' });
-  }
-
+  if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
   try {
+    // Check if email is already taken by another client
     const existingClient = await Client.findOne({ email, _id: { $ne: req.user.id } });
     if (existingClient) return res.status(409).json({ message: 'Email already exists.' });
-
+    
+    // Update the client profile
     const client = await Client.findByIdAndUpdate(
-      req.user.id,
-      { firstName, lastName, email, phone },
+      req.user.id, 
+      { firstName, lastName, email, phone }, 
       { new: true }
     );
-
-    res.json({
+    if (!client) return res.status(404).json({ message: 'Client not found.' });
+    
+    console.log('Client profile updated successfully:', client);
+    res.json({ 
       message: 'Profile updated successfully.',
       client: {
         id: client._id,
         firstName: client.firstName,
         lastName: client.lastName,
         email: client.email,
-        phone: client.phone,
-        role: client.role // ⚡ include role here too
+        phone: client.phone
       }
     });
   } catch (err) {
-    console.error('Error updating client profile:', err);
+    console.log('Error in client profile update:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
