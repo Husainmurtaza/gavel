@@ -923,7 +923,7 @@ app.get('/api/candidates', authenticate, async (req, res) => {
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
-    const candidates = await Candidate.find({}, { firstName: 1, lastName: 1, email: 1, phone: 1});
+    const candidates = await Candidate.find({}, { firstName: 1, lastName: 1, email: 1, phone: 1 });
     res.json(candidates.map(c => ({ id: c._id, firstName: c.firstName, lastName: c.lastName, email: c.email, phone: c.phone })));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -936,15 +936,14 @@ app.get('/api/candidates/profile', authenticate, async (req, res) => {
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
-    const candidate = await Candidate.findById(req.user.id).select('firstName lastName email phone password _id');
+    const candidate = await Candidate.findById(req.user.id).select('firstName lastName email phone _id');
     if (!candidate) return res.status(404).json({ message: 'Candidate not found.' });
     const response = { 
       id: candidate._id, 
       firstName: candidate.firstName, 
       lastName: candidate.lastName, 
       email: candidate.email, 
-      phone: candidate.phone,
-      password: candidate.password
+      phone: candidate.phone 
     };
     res.json(response);
   } catch (err) {
@@ -954,39 +953,27 @@ app.get('/api/candidates/profile', authenticate, async (req, res) => {
 
 // Candidate profile update route
 app.put('/api/candidates/profile', authenticate, async (req, res) => {
+  // Check if user is a candidate
   if (req.user.role !== 'candidate') {
     return res.status(403).json({ message: 'Forbidden - Only candidates can update candidate profiles' });
   }
-
-  const { firstName, lastName, email, phone, password } = req.body;
-  if (!firstName || !lastName || !email || !phone) {
-    return res.status(400).json({ message: 'All fields are required.' });
-  }
-
+  
+  const { firstName, lastName, email, phone } = req.body;
+  if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
   try {
-    // Check if email is already taken
+    // Check if email is already taken by another candidate
     const existingCandidate = await Candidate.findOne({ email, _id: { $ne: req.user.id } });
-    if (existingCandidate) {
-      return res.status(409).json({ message: 'Email already exists.' });
-    }
-
-    const candidate = await Candidate.findById(req.user.id);
-    if (!candidate) {
-      return res.status(404).json({ message: 'Candidate not found.' });
-    }
-
-    candidate.firstName = firstName;
-    candidate.lastName = lastName;
-    candidate.email = email;
-    candidate.phone = phone;
-
-    if (password) {
-      candidate.password = await bcrypt.hash(password, 10); // ✅ hash before saving
-    }
-
-    await candidate.save();
-
-    res.json({
+    if (existingCandidate) return res.status(409).json({ message: 'Email already exists.' });
+    
+    // Update the candidate profile
+    const candidate = await Candidate.findByIdAndUpdate(
+      req.user.id, 
+      { firstName, lastName, email, phone }, 
+      { new: true }
+    );
+    if (!candidate) return res.status(404).json({ message: 'Candidate not found.' });
+    
+    res.json({ 
       message: 'Profile updated successfully.',
       candidate: {
         id: candidate._id,
@@ -1004,7 +991,6 @@ app.put('/api/candidates/profile', authenticate, async (req, res) => {
 app.post('/api/candidates', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
   const { firstName, lastName, email, phone, password } = req.body;
-  console.log(req.body);
   if (!firstName || !lastName || !email || !phone || !password) return res.status(400).json({ message: 'All fields are required.' });
   try {
     const existing = await Candidate.findOne({ email });
@@ -1028,12 +1014,12 @@ app.post('/api/candidates', authenticate, async (req, res) => {
 
 app.put('/api/candidates/:id', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
-  const { firstName, lastName, email, phone, password } = req.body;
+  const { firstName, lastName, email, phone } = req.body;
   if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
   try {
-    const candidate = await Candidate.findByIdAndUpdate(req.params.id, { firstName, lastName, email, phone, password }, { new: true });
+    const candidate = await Candidate.findByIdAndUpdate(req.params.id, { firstName, lastName, email, phone }, { new: true });
     if (!candidate) return res.status(404).json({ message: 'Candidate not found.' });
-    res.json({ id: candidate._id, firstName: candidate.firstName, lastName: candidate.lastName, email: candidate.email, phone: candidate.phone, password: candidate.password });
+    res.json({ id: candidate._id, firstName: candidate.firstName, lastName: candidate.lastName, email: candidate.email, phone: candidate.phone });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
