@@ -82,7 +82,7 @@ app.post("/send-email", async (req, res) => {
   try {
     const data = await resend.emails.send({
       from: "no-reply@evolvegov.com", // verified sender
-      to: "logicwork560@gmail.com",
+      to: "info@evolveworkforcesolutions.com",
       subject: "New Contact Form Submission",
       html: `
         <p><b>Name:</b> ${name}</p>
