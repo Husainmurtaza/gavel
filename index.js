@@ -211,7 +211,9 @@ function authenticate(req, res, next) {
 
 // Example protected route for client dashboard
 app.get('/api/protected/client', authenticate, async (req, res) => {
+  console.log('GET /api/protected/client - User:', req.user); // Debug log
   if (req.user.role !== 'client') {
+    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
@@ -894,7 +896,7 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
   
   // Check if user is a client
   if (req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
+    console.log('Forbidden - User role:', req.user.role, 'Expected: client'); // Debug log
     return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
   }
   
