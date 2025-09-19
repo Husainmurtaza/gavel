@@ -38,31 +38,6 @@ mongoose
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
-// Resend email setup
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-app.post("/send-email", async (req, res) => {
-  const { name, email, phone, details } = req.body;
-
-  try {
-    const data = await resend.emails.send({
-      from: "no-reply@evolvegov.com", // must be verified
-      to: "logicwork560@gmail.com",          // replace with your email
-      subject: "New Contact Form Submission",
-      html: `
-        <p><b>Name:</b> ${name}</p>
-        <p><b>Email:</b> ${email}</p>
-        <p><b>Phone:</b> ${phone}</p>
-        <p><b>Message:</b> ${details}</p>
-      `,
-    });
-
-    res.json({ success: true, data });
-  } catch (error) {
-    console.error("Email send error:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 
 // Middleware
@@ -92,6 +67,38 @@ const corsOrigins = process.env.CORS_ORIGINS
       credentials: true
     }));  
 app.use(cookieParser());
+
+
+
+// Resend email setup
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+app.post("/send-email", async (req, res) => {
+  const { name, email, phone, details } = req.body;
+
+  if (!name || !email || !phone || !details) {
+    return res.status(400).json({ success: false, error: "Missing fields" });
+  }
+
+  try {
+    const data = await resend.emails.send({
+      from: "no-reply@evolvegov.com", // verified sender
+      to: "logicwork560@gmail.com",
+      subject: "New Contact Form Submission",
+      html: `
+        <p><b>Name:</b> ${name}</p>
+        <p><b>Email:</b> ${email}</p>
+        <p><b>Phone:</b> ${phone}</p>
+        <p><b>Message:</b> ${details}</p>
+      `,
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error("Email send error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // MongoDB Connection with optimized settings
 mongoose.connect(MONGO_URI, {
