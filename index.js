@@ -954,7 +954,6 @@ app.get('/api/candidates/profile', authenticate, async (req, res) => {
 
 // Candidate profile update route
 app.put('/api/candidates/profile', authenticate, async (req, res) => {
-  // Check if user is a candidate
   if (req.user.role !== 'candidate') {
     return res.status(403).json({ message: 'Forbidden - Only candidates can update candidate profiles' });
   }
@@ -965,28 +964,27 @@ app.put('/api/candidates/profile', authenticate, async (req, res) => {
   }
 
   try {
-    // Check if email is already taken by another candidate
+    // Check if email is already taken
     const existingCandidate = await Candidate.findOne({ email, _id: { $ne: req.user.id } });
     if (existingCandidate) {
       return res.status(409).json({ message: 'Email already exists.' });
     }
 
-    // ✅ Build update object without password unless provided
-    const updateData = { firstName, lastName, email, phone };
-    if (password && password.trim() !== "") {
-      updateData.password = password; // hash here if needed
-    }
-
-    // Update the candidate profile
-    const candidate = await Candidate.findByIdAndUpdate(
-      req.user.id,
-      updateData,
-      { new: true }
-    );
-
+    const candidate = await Candidate.findById(req.user.id);
     if (!candidate) {
       return res.status(404).json({ message: 'Candidate not found.' });
     }
+
+    candidate.firstName = firstName;
+    candidate.lastName = lastName;
+    candidate.email = email;
+    candidate.phone = phone;
+
+    if (password) {
+      candidate.password = await bcrypt.hash(password, 10); // ✅ hash before saving
+    }
+
+    await candidate.save();
 
     res.json({
       message: 'Profile updated successfully.',
@@ -995,15 +993,13 @@ app.put('/api/candidates/profile', authenticate, async (req, res) => {
         firstName: candidate.firstName,
         lastName: candidate.lastName,
         email: candidate.email,
-        phone: candidate.phone,
-        // ❌ Don’t send password back in response (security)
+        phone: candidate.phone
       }
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
-
 
 app.post('/api/candidates', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
