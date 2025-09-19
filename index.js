@@ -212,9 +212,9 @@ function authenticate(req, res, next) {
 // Example protected route for client dashboard
 app.get('/api/protected/client', authenticate, async (req, res) => {
   try {
-    // Check user's role from JWT token (consistent with other client routes)
-    if (req.user.role && req.user.role !== 'client') {
-      console.log('Forbidden - User role from JWT:', req.user.role);
+    // Check if user is a client (same logic as candidate route)
+    if (req.user.role !== 'client') {
+      console.log('Forbidden - User role:', req.user.role);
       return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
     }
     
@@ -852,22 +852,21 @@ app.delete('/api/clients/:id', authenticate, async (req, res) => {
 // Client profile GET route
 app.get('/api/clients/profile', authenticate, async (req, res) => {
   console.log('GET /api/clients/profile - User:', req.user); // Debug log
+  if (req.user.role !== 'client') {
+    console.log('Forbidden - User role:', req.user.role); // Debug log
+    return res.status(403).json({ message: 'Forbidden' });
+  }
   try {
-    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id role');
+    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
     console.log('Client found:', client); // Debug log
-    if (!client) return res.status(403).json({ message: 'Forbidden - Not a client' });
-
+    if (!client) return res.status(404).json({ message: 'Client not found.' });
     const response = { 
-      client: {
-        id: client._id,
-        firstName: client.firstName,
-        lastName: client.lastName,
-        email: client.email,
-        phone: client.phone,
-        role: client.role // ⚡ include role
-      }
+      id: client._id, 
+      firstName: client.firstName, 
+      lastName: client.lastName, 
+      email: client.email, 
+      phone: client.phone 
     };
-
     console.log('Sending response:', response); // Debug log
     res.json(response);
   } catch (err) {
@@ -907,9 +906,9 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
    console.log('PUT /api/clients/profile - User:', req.user); // DEBUG: show JWT payload
   console.log('PUT /api/clients/profile - Body:', req.body); // DEBUG: show submitted data
 
-  // Check user's role from JWT token (consistent with ensure-role route)
-  if (req.user.role && req.user.role !== 'client') {
-    console.log('Forbidden - User role from JWT:', req.user.role);
+  // Check if user is a client (same logic as candidate route)
+  if (req.user.role !== 'client') {
+    console.log('Forbidden - User role:', req.user.role);
     return res.status(403).json({ message: 'Forbidden - Only clients can update profiles' });
   }
   
@@ -1210,9 +1209,9 @@ app.put('/api/admin/interviews/:id/reject', authenticate, async (req, res) => {
 // Get interviews for the logged-in client (positions they've posted)
 app.get('/api/client/interviews', authenticate, async (req, res) => {
   try {
-    // Check user's role from JWT token (consistent with other client routes)
-    if (req.user.role && req.user.role !== 'client') {
-      console.log('Forbidden - User role from JWT:', req.user.role);
+    // Check if user is a client (same logic as candidate route)
+    if (req.user.role !== 'client') {
+      console.log('Forbidden - User role:', req.user.role);
       return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
     }
     
