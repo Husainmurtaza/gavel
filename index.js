@@ -212,16 +212,22 @@ function authenticate(req, res, next) {
 // Example protected route for client dashboard
 app.get('/api/protected/client', authenticate, async (req, res) => {
   try {
-    // Check user's role from database instead of JWT token
+    // Check user's role from JWT token (consistent with other client routes)
+    if (req.user.role && req.user.role !== 'client') {
+      console.log('Forbidden - User role from JWT:', req.user.role);
+      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
+    }
+    
+    // Verify client exists in database
     const client = await Client.findById(req.user.id);
     if (!client) {
       return res.status(404).json({ message: 'Client not found' });
     }
     
-    // Check if user is a client or if role is missing (legacy users)
-    if (client.role && client.role !== 'client') {
-      console.log('Forbidden - User role from DB:', client.role);
-      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
+    // If role is missing in database, set it to 'client' for legacy users
+    if (!client.role) {
+      console.log('Setting missing role to client for user:', req.user.id);
+      await Client.findByIdAndUpdate(req.user.id, { role: 'client' });
     }
     
     const response = { 
@@ -901,15 +907,22 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
    console.log('PUT /api/clients/profile - User:', req.user); // DEBUG: show JWT payload
   console.log('PUT /api/clients/profile - Body:', req.body); // DEBUG: show submitted data
 
-  // Check user's role from database instead of JWT token
+  // Check user's role from JWT token (consistent with ensure-role route)
+  if (req.user.role && req.user.role !== 'client') {
+    console.log('Forbidden - User role from JWT:', req.user.role);
+    return res.status(403).json({ message: 'Forbidden - Only clients can update profiles' });
+  }
+  
+  // Verify client exists in database
   const clientCheck = await Client.findById(req.user.id);
   if (!clientCheck) {
     return res.status(404).json({ message: 'Client not found' });
   }
-  // Check if user is a client or if role is missing (legacy users)
-  if (clientCheck.role && clientCheck.role !== 'client') {
-    console.log('Forbidden - User role from DB:', clientCheck.role);
-    return res.status(403).json({ message: 'Forbidden - Only clients can update profiles' });
+  
+  // If role is missing in database, set it to 'client' for legacy users
+  if (!clientCheck.role) {
+    console.log('Setting missing role to client for user:', req.user.id);
+    await Client.findByIdAndUpdate(req.user.id, { role: 'client' });
   }
 
   const { firstName, lastName, email, phone } = req.body;
@@ -1197,16 +1210,22 @@ app.put('/api/admin/interviews/:id/reject', authenticate, async (req, res) => {
 // Get interviews for the logged-in client (positions they've posted)
 app.get('/api/client/interviews', authenticate, async (req, res) => {
   try {
-    // Check user's role from database instead of JWT token
+    // Check user's role from JWT token (consistent with other client routes)
+    if (req.user.role && req.user.role !== 'client') {
+      console.log('Forbidden - User role from JWT:', req.user.role);
+      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
+    }
+    
+    // Verify client exists in database
     const client = await Client.findById(req.user.id);
     if (!client) {
       return res.status(404).json({ message: 'Client not found' });
     }
     
-    // Check if user is a client or if role is missing (legacy users)
-    if (client.role && client.role !== 'client') {
-      console.log('Forbidden - User role from DB:', client.role);
-      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
+    // If role is missing in database, set it to 'client' for legacy users
+    if (!client.role) {
+      console.log('Setting missing role to client for user:', req.user.id);
+      await Client.findByIdAndUpdate(req.user.id, { role: 'client' });
     }
     
     const page = parseInt(req.query.page) || 1;
