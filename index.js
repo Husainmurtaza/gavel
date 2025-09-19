@@ -894,32 +894,29 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
 
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
-  console.log('PUT /api/clients/profile - User:', req.user); // Debug log
-  console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
-  
-  const { firstName, lastName, email, phone } = req.body;
-  if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
-  try {
-    // Ensure the requester is a client by DB check
-    const currentClient = await Client.findById(req.user.id).select('_id');
-    if (!currentClient) {
-      return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
-    }
+  // Check role
+  if (req.user.role !== 'client') {
+    return res.status(403).json({ message: 'Forbidden - Only clients can update profiles' });
+  }
 
-    // Check if email is already taken by another client
+  const { firstName, lastName, email, phone } = req.body;
+  if (!firstName || !lastName || !email || !phone) {
+    return res.status(400).json({ message: 'All fields are required.' });
+  }
+
+  try {
+    // Check if email is taken by another client
     const existingClient = await Client.findOne({ email, _id: { $ne: req.user.id } });
     if (existingClient) return res.status(409).json({ message: 'Email already exists.' });
-    
-    // Update the client profile
+
+    // Update client profile
     const client = await Client.findByIdAndUpdate(
-      req.user.id, 
-      { firstName, lastName, email, phone }, 
+      req.user.id,
+      { firstName, lastName, email, phone },
       { new: true }
     );
-    if (!client) return res.status(404).json({ message: 'Client not found.' });
-    
-    console.log('Client profile updated successfully:', client);
-    res.json({ 
+
+    res.json({
       message: 'Profile updated successfully.',
       client: {
         id: client._id,
@@ -930,10 +927,12 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
       }
     });
   } catch (err) {
-    console.log('Error in client profile update:', err.message); // Debug log
+    console.error('Error updating client profile:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
+
 
 // CRUD for Candidates (admin only)
 app.get('/api/candidates', authenticate, async (req, res) => {
