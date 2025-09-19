@@ -211,25 +211,12 @@ function authenticate(req, res, next) {
 
 // Example protected route for client dashboard
 app.get('/api/protected/client', authenticate, async (req, res) => {
+  if (req.user.role !== 'client') {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
   try {
-    // Check if user is a client (same logic as candidate route)
-    if (req.user.role !== 'client') {
-      console.log('Forbidden - User role:', req.user.role);
-      return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
-    }
-    
-    // Verify client exists in database
-    const client = await Client.findById(req.user.id);
-    if (!client) {
-      return res.status(404).json({ message: 'Client not found' });
-    }
-    
-    // If role is missing in database, set it to 'client' for legacy users
-    if (!client.role) {
-      console.log('Setting missing role to client for user:', req.user.id);
-      await Client.findByIdAndUpdate(req.user.id, { role: 'client' });
-    }
-    
+    const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
+    if (!client) return res.status(404).json({ message: 'Client not found' });
     const response = { 
       id: client._id, 
       firstName: client.firstName, 
@@ -239,7 +226,6 @@ app.get('/api/protected/client', authenticate, async (req, res) => {
     };
     res.json(response);
   } catch (err) {
-    console.error('Error in protected client route:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
