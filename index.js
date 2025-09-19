@@ -850,15 +850,18 @@ app.get('/api/clients/profile', authenticate, async (req, res) => {
     const client = await Client.findById(req.user.id).select('firstName lastName email phone _id role');
     console.log('Client found:', client); // Debug log
     if (!client) return res.status(403).json({ message: 'Forbidden - Not a client' });
+
     const response = { 
       client: {
         id: client._id,
         firstName: client.firstName,
         lastName: client.lastName,
         email: client.email,
-        phone: client.phone
+        phone: client.phone,
+        role: client.role // ⚡ include role
       }
     };
+
     console.log('Sending response:', response); // Debug log
     res.json(response);
   } catch (err) {
@@ -866,6 +869,7 @@ app.get('/api/clients/profile', authenticate, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
 
 // Route to ensure client role is set (for legacy users)
 app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
@@ -894,12 +898,7 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
 
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
-  // Debug log: check incoming user
-  console.log('PUT /api/clients/profile - req.user:', req.user);
-
-  // Check role
-  if (!req.user?.id || req.user.role !== 'client') {
-    console.log('Forbidden: req.user check failed', req.user); // debug log
+  if (req.user.role !== 'client') {
     return res.status(403).json({ message: 'Forbidden - Only clients can update profiles' });
   }
 
@@ -909,11 +908,9 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
   }
 
   try {
-    // Check if email is taken by another client
     const existingClient = await Client.findOne({ email, _id: { $ne: req.user.id } });
     if (existingClient) return res.status(409).json({ message: 'Email already exists.' });
 
-    // Update client profile
     const client = await Client.findByIdAndUpdate(
       req.user.id,
       { firstName, lastName, email, phone },
@@ -927,7 +924,8 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
         firstName: client.firstName,
         lastName: client.lastName,
         email: client.email,
-        phone: client.phone
+        phone: client.phone,
+        role: client.role // ⚡ include role here too
       }
     });
   } catch (err) {
@@ -935,6 +933,7 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
 
 
 
