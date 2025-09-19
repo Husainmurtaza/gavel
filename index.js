@@ -50,8 +50,8 @@ const corsOrigins = process.env.CORS_ORIGINS
     
       'https://joingavel.com',        // Live frontend
       'https://www.joingavel.com',    // Live frontend www
-      'https://evolvegov.com/',  // Live backend
-      'https://www.evolvegov.com/'  // Live backend
+      'https://evolvegov.com',  // Live backend
+      'https://www.evolvegov.com'  // Live backend
     ];
 
     app.use(cors({
