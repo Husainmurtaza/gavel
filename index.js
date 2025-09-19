@@ -46,8 +46,8 @@ app.post("/send-email", async (req, res) => {
 
   try {
     const data = await resend.emails.send({
-      from: "onboarding@resend.dev", // must be verified
-      to: "your@email.com",          // replace with your email
+      from: "no-reply@evolvegov.com", // must be verified
+      to: "logicwork560@gmail.com",          // replace with your email
       subject: "New Contact Form Submission",
       html: `
         <p><b>Name:</b> ${name}</p>
