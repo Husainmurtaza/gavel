@@ -894,8 +894,12 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
 
 // Client profile update route
 app.put('/api/clients/profile', authenticate, async (req, res) => {
+  // Debug log: check incoming user
+  console.log('PUT /api/clients/profile - req.user:', req.user);
+
   // Check role
-  if (req.user.role !== 'client') {
+  if (!req.user?.id || req.user.role !== 'client') {
+    console.log('Forbidden: req.user check failed', req.user); // debug log
     return res.status(403).json({ message: 'Forbidden - Only clients can update profiles' });
   }
 
