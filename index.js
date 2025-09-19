@@ -211,9 +211,7 @@ function authenticate(req, res, next) {
 
 // Example protected route for client dashboard
 app.get('/api/protected/client', authenticate, async (req, res) => {
-  console.log('GET /api/protected/client - User:', req.user); // Debug log
   if (req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
@@ -612,9 +610,7 @@ app.put('/api/protected/admin/profile', authenticate, async (req, res) => {
 
 // GET positions: populate company with optimized query
 app.get('/api/positions', authenticate, async (req, res) => {
-  console.log('GET /api/positions - User:', req.user); // Debug log
   if (req.user.role !== 'admin' && req.user.role !== 'candidate') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
@@ -678,9 +674,7 @@ app.delete('/api/positions/:id', authenticate, async (req, res) => {
 
 // CRUD for Companies (admin only)
 app.get('/api/companies', authenticate, async (req, res) => {
-  console.log('GET /api/companies - User:', req.user); // Debug log
   if (req.user.role !== 'admin') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
@@ -736,9 +730,7 @@ app.delete('/api/companies/:id', authenticate, async (req, res) => {
 
 // CRUD for Clients (admin only)
 app.get('/api/clients', authenticate, async (req, res) => {
-  console.log('GET /api/clients - User:', req.user); // Debug log
   if (req.user.role !== 'admin') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
@@ -786,12 +778,8 @@ app.post('/api/clients', authenticate, async (req, res) => {
 
 // Client profile update route (MUST come before /api/clients/:id)
 app.put('/api/clients/profile', authenticate, async (req, res) => {
-  console.log('PUT /api/clients/profile - User:', req.user); // Debug log
-  console.log('PUT /api/clients/profile - Body:', req.body); // Debug log
-  
   // Check if user is a client
   if (req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role, 'Expected: client'); // Debug log
     return res.status(403).json({ message: 'Forbidden - Only clients can update client profiles' });
   }
   
@@ -810,7 +798,6 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
     );
     if (!client) return res.status(404).json({ message: 'Client not found.' });
     
-    console.log('Client profile updated successfully:', client);
     res.json({ 
       message: 'Profile updated successfully.',
       client: {
@@ -822,7 +809,6 @@ app.put('/api/clients/profile', authenticate, async (req, res) => {
       }
     });
   } catch (err) {
-    console.log('Error in client profile update:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -882,14 +868,11 @@ app.delete('/api/clients/:id', authenticate, async (req, res) => {
 
 // Client profile GET route
 app.get('/api/clients/profile', authenticate, async (req, res) => {
-  console.log('GET /api/clients/profile - User:', req.user); // Debug log
   if (req.user.role !== 'client') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
     const client = await Client.findById(req.user.id).select('firstName lastName email phone _id');
-    console.log('Client found:', client); // Debug log
     if (!client) return res.status(404).json({ message: 'Client not found.' });
     const response = { 
       id: client._id, 
@@ -898,10 +881,8 @@ app.get('/api/clients/profile', authenticate, async (req, res) => {
       email: client.email, 
       phone: client.phone 
     };
-    console.log('Sending response:', response); // Debug log
     res.json(response);
   } catch (err) {
-    console.log('Error in /api/clients/profile:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -938,14 +919,12 @@ app.post('/api/clients/ensure-role', authenticate, async (req, res) => {
 
 // CRUD for Candidates (admin only)
 app.get('/api/candidates', authenticate, async (req, res) => {
-  console.log('GET /api/candidates - User:', req.user); // Debug log
   if (req.user.role !== 'admin') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
-    const candidates = await Candidate.find({}, { firstName: 1, lastName: 1, email: 1, phone: 1 });
-    res.json(candidates.map(c => ({ id: c._id, firstName: c.firstName, lastName: c.lastName, email: c.email, phone: c.phone })));
+    const candidates = await Candidate.find({}, { firstName: 1, lastName: 1, email: 1, phone: 1, password: 1 });
+    res.json(candidates.map(c => ({ id: c._id, firstName: c.firstName, lastName: c.lastName, email: c.email, phone: c.phone, password: c.password })));
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -953,42 +932,34 @@ app.get('/api/candidates', authenticate, async (req, res) => {
 
 // Candidate profile GET route
 app.get('/api/candidates/profile', authenticate, async (req, res) => {
-  console.log('GET /api/candidates/profile - User:', req.user); // Debug log
   if (req.user.role !== 'candidate') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden' });
   }
   try {
-    const candidate = await Candidate.findById(req.user.id).select('firstName lastName email phone _id');
-    console.log('Candidate found:', candidate); // Debug log
+    const candidate = await Candidate.findById(req.user.id).select('firstName lastName email phone password _id');
     if (!candidate) return res.status(404).json({ message: 'Candidate not found.' });
     const response = { 
       id: candidate._id, 
       firstName: candidate.firstName, 
       lastName: candidate.lastName, 
       email: candidate.email, 
-      phone: candidate.phone 
+      phone: candidate.phone,
+      password: candidate.password
     };
-    console.log('Sending response:', response); // Debug log
     res.json(response);
   } catch (err) {
-    console.log('Error in /api/candidates/profile:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
 // Candidate profile update route
 app.put('/api/candidates/profile', authenticate, async (req, res) => {
-  console.log('PUT /api/candidates/profile - User:', req.user); // Debug log
-  console.log('PUT /api/candidates/profile - Body:', req.body); // Debug log
-  
   // Check if user is a candidate
   if (req.user.role !== 'candidate') {
-    console.log('Forbidden - User role:', req.user.role); // Debug log
     return res.status(403).json({ message: 'Forbidden - Only candidates can update candidate profiles' });
   }
   
-  const { firstName, lastName, email, phone } = req.body;
+  const { firstName, lastName, email, phone, password } = req.body;
   if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
   try {
     // Check if email is already taken by another candidate
@@ -998,12 +969,11 @@ app.put('/api/candidates/profile', authenticate, async (req, res) => {
     // Update the candidate profile
     const candidate = await Candidate.findByIdAndUpdate(
       req.user.id, 
-      { firstName, lastName, email, phone }, 
+      { firstName, lastName, email, phone, password }, 
       { new: true }
     );
     if (!candidate) return res.status(404).json({ message: 'Candidate not found.' });
     
-    console.log('Candidate profile updated successfully:', candidate);
     res.json({ 
       message: 'Profile updated successfully.',
       candidate: {
@@ -1011,11 +981,11 @@ app.put('/api/candidates/profile', authenticate, async (req, res) => {
         firstName: candidate.firstName,
         lastName: candidate.lastName,
         email: candidate.email,
-        phone: candidate.phone
+        phone: candidate.phone,
+        password: candidate.password
       }
     });
   } catch (err) {
-    console.log('Error in candidate profile update:', err.message); // Debug log
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -1023,6 +993,7 @@ app.put('/api/candidates/profile', authenticate, async (req, res) => {
 app.post('/api/candidates', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
   const { firstName, lastName, email, phone, password } = req.body;
+  console.log(req.body);
   if (!firstName || !lastName || !email || !phone || !password) return res.status(400).json({ message: 'All fields are required.' });
   try {
     const existing = await Candidate.findOne({ email });
@@ -1046,12 +1017,12 @@ app.post('/api/candidates', authenticate, async (req, res) => {
 
 app.put('/api/candidates/:id', authenticate, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
-  const { firstName, lastName, email, phone } = req.body;
+  const { firstName, lastName, email, phone, password } = req.body;
   if (!firstName || !lastName || !email || !phone) return res.status(400).json({ message: 'All fields are required.' });
   try {
-    const candidate = await Candidate.findByIdAndUpdate(req.params.id, { firstName, lastName, email, phone }, { new: true });
+    const candidate = await Candidate.findByIdAndUpdate(req.params.id, { firstName, lastName, email, phone, password }, { new: true });
     if (!candidate) return res.status(404).json({ message: 'Candidate not found.' });
-    res.json({ id: candidate._id, firstName: candidate.firstName, lastName: candidate.lastName, email: candidate.email, phone: candidate.phone });
+    res.json({ id: candidate._id, firstName: candidate.firstName, lastName: candidate.lastName, email: candidate.email, phone: candidate.phone, password: candidate.password });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -1070,7 +1041,6 @@ app.delete('/api/candidates/:id', authenticate, async (req, res) => {
 
 // Save interview result (webhook endpoint)
 app.post('/api/interviews', async (req, res) => {
-  console.log("📥 Received data at /api/interviews:", req.body);
   try {
     const { positionName, candidateId, email, interviewID, positionDescription, positionId, summary, transcript, status } = req.body;
     if (!positionName || !candidateId || !email || !interviewID || !positionId) {
@@ -1188,7 +1158,6 @@ app.get('/api/client/interviews', authenticate, async (req, res) => {
   try {
     // Check if user is a client (same logic as candidate route)
     if (req.user.role !== 'client') {
-      console.log('Forbidden - User role:', req.user.role);
       return res.status(403).json({ message: 'Forbidden - Only clients can access this endpoint' });
     }
     
@@ -1200,7 +1169,6 @@ app.get('/api/client/interviews', authenticate, async (req, res) => {
     
     // If role is missing in database, set it to 'client' for legacy users
     if (!client.role) {
-      console.log('Setting missing role to client for user:', req.user.id);
       await Client.findByIdAndUpdate(req.user.id, { role: 'client' });
     }
     
