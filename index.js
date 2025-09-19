@@ -23,7 +23,6 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json({ limit: "11mb" }));
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use(cors());
 app.use(cookieParser());
 
 // MongoDB connection
