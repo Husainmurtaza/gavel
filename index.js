@@ -1197,6 +1197,66 @@ app.get('/api/client/interviews', authenticate, async (req, res) => {
   }
 });
 
+// CRUD for Admins (admin only)
+app.get('/api/admins', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  try {
+    const admins = await Admin.find({}, { name: 1, email: 1 });
+    res.json(admins.map(a => ({ id: a._id, name: a.name, email: a.email })));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+app.post('/api/admins', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  const { name, email, password } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ message: 'Name, email and password are required.' });
+  try {
+    const existing = await Admin.findOne({ email });
+    if (existing) return res.status(409).json({ message: 'Email already exists.' });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const admin = new Admin({ name, email, password: hashedPassword });
+    await admin.save();
+    res.status(201).json({ id: admin._id, name: admin.name, email: admin.email });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+app.put('/api/admins/:id', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  const { name, email, password } = req.body;
+  if (!name || !email) return res.status(400).json({ message: 'Name and email are required.' });
+  try {
+    const existingAdmin = await Admin.findOne({ email, _id: { $ne: req.params.id } });
+    if (existingAdmin) return res.status(409).json({ message: 'Email already exists.' });
+    const updateData = { name, email };
+    if (password && password.trim() !== '') {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(password, salt);
+    }
+    const admin = await Admin.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (!admin) return res.status(404).json({ message: 'Admin not found.' });
+    res.json({ id: admin._id, name: admin.name, email: admin.email });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+app.delete('/api/admins/:id', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  try {
+    const admin = await Admin.findByIdAndDelete(req.params.id);
+    if (!admin) return res.status(404).json({ message: 'Admin not found.' });
+    res.json({ message: 'Admin deleted.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 }); 
